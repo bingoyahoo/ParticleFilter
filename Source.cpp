@@ -112,8 +112,8 @@ void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, i
 	for (int i = 0; i < bins; i++ ){    
 		colorHist[i] = 0.0;
 	}
-	/* Consider the special scenario where x0, y0 are outside the image
-	or Wx<=0, Hy<=0. Set the colour histogram to be 0 in such cases*/
+	/* Consider the special scenario where x0, y0 are outside the image or Wx<=0, Hy<=0. 
+	Set the colour histogram to be 0 in such cases. */
 	if ( ( x0 < 0 ) || (x0 >= W) || ( y0 < 0 ) || ( y0 >= H ) || ( Wx <= 0 ) || ( Hy <= 0 ) ) {
 		return;
 	}
@@ -155,12 +155,10 @@ void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, i
 }
 
 /*
-calculate Bhattacharyya coefficient
+Returns Bhattacharyya coefficient -a measure of the amount of overlap between two statistical samples or populations
 Input parameters：
 float * p, * q：      two colour histogram density estimation
 int bins：            histogram values
-Returns Bhattacharyya coefficient -a measure of the amount of overlap between 
-two statistical samples or populations
 */
 float calBhattacharyya(float * p, float * q, int bins){
 	float rho = 0.0;
@@ -181,27 +179,24 @@ float calWeightedPi(float rho){
 Generating a pseudo-random number between [0, 1] using Park and Miller method
 */
 float ran0(long *idum){
-	/* *idum ^= MASK;*/      /* XORing with MASK allows use of zero and other */
-	long k = (*idum)/IQ;            /* simple bit patterns for idum.                 */
-	*idum = IA*(*idum-k*IQ)-IR*k;  /* Compute idum=(IA*idum) % IM without over- */
+	long k = (*idum) / IQ;            /* simple bit patterns for idum.                 */
+	*idum = IA*( *idum - k * IQ) - IR * k;  /* Compute idum = (IA*idum) % IM without over- */
 	if (*idum < 0) {
 		*idum += IM;  /* flows by Schrage’s method.               */
 	}
 	float ans = AM * (*idum);          /* Convert idum to a floating result.            */
-	/* *idum ^= MASK;*/      /* Unmask before return.                         */
 	return ans;
 }
 
 //Return a random floating number between 0, 1
 float rand0_1(){
-	return( ran0( &ran_seed ) );
+	return ran0(&ran_seed);
 }
 
 //Return a random value from a Gaussian distrbution x ~ N(u, sigma)
 float randGaussian( float u, float sigma){
-	float x1, x2, v1, v2;
+	float x1, x2, v1, v2, y;
 	float s = 100.0;
-	float y;
 	/*
 	Use the screening method (Box-Mulles method) to produce a random number from a 
 	normal distribution N~(0,1) 	
@@ -214,7 +209,7 @@ float randGaussian( float u, float sigma){
 	4. Calculate A = (-2ln(s)/s) ^ (1/2), y1 = V1 * A, y2 = V2 * A
 	y1, y2 follows N ~ (0,1) random variable
 	*/
-	while ( s > 1.0 ){
+	while (s > 1.0){
 		x1 = rand0_1();
 		x2 = rand0_1();
 		v1 = 2 * x1 - 1;
@@ -224,7 +219,7 @@ float randGaussian( float u, float sigma){
 	y = (float)(sqrt( -2.0 * log(s)/s ) * v1);
 	/*
 	According to the formula
-	z = ( y - u )/ sqrt(sigma)
+	z = (y - u)/ sqrt(sigma)
 	normalize y variable into a standard normal distrbution Z ~ N(u, sigma)
 	*/
 	return( y - u )/ sqrt(sigma);	
@@ -241,11 +236,11 @@ int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H
 	float random[7];
 	setSeed(0); /* for random */
 	states = new SPACESTATE [NUM_PARTICLE]; // assign memory for statespace array 
-	if ( states == NULL ) {
+	if (states == NULL) {
 		return -2;
 	}
 	weights = new float [NUM_PARTICLE];     // assign memory for weight array
-	if ( weights == NULL ) {
+	if (weights == NULL) {
 		return -3;	
 	}
 	nbin = R_BIN * G_BIN * B_BIN; /* Determine the values of histogram */
@@ -254,9 +249,8 @@ int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H
 		return -1;
 	}
 	//Calculation of model target histogram
-	calColorHistogram( x0, y0, Wx, Hy, img, W, H, modelHist, nbin );
-	/* Initialize particle state with x0, y0, 1, 1, Wx, Hy, 0.1
-	taking center of Normal Distribution to be N(0, 0.4) */
+	calColorHistogram(x0, y0, Wx, Hy, img, W, H, modelHist, nbin);
+	// Initialize particle state with x0, y0, 1, 1, Wx, Hy, 0.1	taking center of Normal Distribution to be N(0, 0.4)
 	states[0].xCoor = x0;
 	states[0].yCoor = y0;
 	states[0].v_xt = (float) 0.0; 
@@ -267,7 +261,7 @@ int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H
 	weights[0] = (float)(1.0/ NUM_PARTICLE); 
 	for ( int i = 1; i < NUM_PARTICLE; i++ ) {
 		for ( int j = 0; j < 7; j++ ) {
-			random[j] = randGaussian( 0, (float)0.6 ); /* Produce seven random Gaussian numbers */
+			random[j] = randGaussian( 0, (float)0.6 ); //Produce seven random Gaussian numbers 
 		}
 		states[i].xCoor = (int)( states[0].xCoor + random[0] * Wx );
 		states[i].yCoor = (int)( states[0].yCoor + random[1] * Hy );
@@ -276,7 +270,7 @@ int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H
 		states[i].Hxt = (int)( states[0].Hxt + random[4] * SCALE_DISTURB );
 		states[i].Hyt = (int)( states[0].Hyt + random[5] * SCALE_DISTURB );
 		states[i].at_dot = (float)( states[0].at_dot + random[6] * SCALE_CHANGE_D );
-		/* average weight is 1/N, because all particles  have equal probability*/
+		// average weight is 1/N, because all particles  have equal probability
 		weights[i] = (float)(1.0 / NUM_PARTICLE);
 	}
 	return 1;
@@ -325,13 +319,13 @@ int N：              Weight array, number of elements in resampling index of ar
 Puts indexes of resamples into array called resampleIndex
 */
 void sampleImportance( float * c, int * resampleIndex, int N ){
-	float rand_num, * cumulatedWeight;
-	cumulatedWeight = new float [N+1]; // assign memory for the cumulated weight array with size N+1 
-	normalizeCumulatedWeight(c, cumulatedWeight, N ); // calculate the cumulated weight 
+	float rand_num, *cumulatedWeight;
+	cumulatedWeight = new float [N + 1]; // assign memory for the cumulated weight array with size N+1 
+	normalizeCumulatedWeight(c, cumulatedWeight, N); // calculate the cumulated weight 
 	for (int i = 0; i < N; i++ ) {
 		rand_num = rand0_1();     
-		int j = binarySearch( rand_num, cumulatedWeight, N + 1 ); /* Find the smallest index j with value <=rnum */
-		if ( j == N ) {
+		int j = binarySearch(rand_num, cumulatedWeight, N + 1); /* Find the smallest index j with value <=rnum */
+		if (j == N) {
 			j--;
 		}
 		resampleIndex[i] = j;	/* insert resampling index values */		
@@ -344,14 +338,14 @@ void sampleImportance( float * c, int * resampleIndex, int N ){
 Reselect N new samples from N input samples based on their weights
 Put values back into originalSampleSet
 */
-void reselectParticles( SPACESTATE * originalSampleSet, float * originalWeights, int numSamples ){
-	SPACESTATE * tempState = new SPACESTATE[numSamples];
-	int * reselectIndex = new int[numSamples];
+void reselectParticles( SPACESTATE *originalSampleSet, float *originalWeights, int numSamples ){
+	SPACESTATE *tempState = new SPACESTATE[numSamples];
+	int *reselectIndex = new int[numSamples];
 	sampleImportance( originalWeights, reselectIndex, numSamples ); // Resample according to weights 
-	for ( int i = 0; i < numSamples; i++ ){
+	for (int i = 0; i < numSamples; i++ ){
 		tempState[i] = originalSampleSet[reselectIndex[i]];
 	}
-	for ( int i = 0; i < numSamples; i++ ){
+	for (int i = 0; i < numSamples; i++ ){
 		originalSampleSet[i] = tempState[i];
 	}
 	delete[] tempState;
@@ -365,7 +359,7 @@ The system equation is S(t) = A S(t-1) + W(t-1)
 where W(t-1) stands for the Gaussian noise.
 Puts predicted state into the state array after update.
 */
-void propagate( SPACESTATE * state, int numStates ){
+void propagate(SPACESTATE *state, int numStates ){
 	float randomNum[7];
 	/* Update every state within state[i] */
 	for (int i = 0; i < numStates; i++ ){ /* Add a mean 0 random Gaussian noise */
@@ -376,8 +370,8 @@ void propagate( SPACESTATE * state, int numStates ){
 		state[i].yCoor = (int)(state[i].yCoor + state[i].v_yt * DELTA_T + randomNum[1] * state[i].Hyt + 0.5);
 		state[i].v_xt = (float)(state[i].v_xt + randomNum[2] * VELOCITY_DISTURB);
 		state[i].v_yt = (float)(state[i].v_yt + randomNum[3] * VELOCITY_DISTURB);
-		state[i].Hxt = (int)(state[i].Hxt+state[i].Hxt*state[i].at_dot + randomNum[4] * SCALE_DISTURB + 0.5);
-		state[i].Hyt = (int)(state[i].Hyt+state[i].Hyt*state[i].at_dot + randomNum[5] * SCALE_DISTURB + 0.5);
+		state[i].Hxt = (int)(state[i].Hxt + state[i].Hxt * state[i].at_dot + randomNum[4] * SCALE_DISTURB + 0.5);
+		state[i].Hyt = (int)(state[i].Hyt + state[i].Hyt * state[i].at_dot + randomNum[5] * SCALE_DISTURB + 0.5);
 		state[i].at_dot = (float)(state[i].at_dot + randomNum[6] * SCALE_CHANGE_D);
 		//cvCircle(imgTrack, Point(state[i].xCoor, state[i].yCoor), 3 , CV_RGB(255, 255, 0), 1, 4, 3 ); //to draw particle
 	}
@@ -388,8 +382,8 @@ void propagate( SPACESTATE * state, int numStates ){
 Observe: Using the state set St of each sample and the observation from the histogram, 
 update the estimation to get new weighted probabilities. Modifies the weight array directly
 */
-void observe( SPACESTATE * state, float * weight, int size, unsigned char * image, int widthImg, int heightImg, float * objectHist, int hbins ){
-	float * colorHist = new float[hbins];
+void observe( SPACESTATE *state, float *weight, int size, unsigned char *image, int widthImg, int heightImg, float *objectHist, int hbins ){
+	float *colorHist = new float[hbins];
 	for (int i = 0; i < size; i++ ) {
 		// 1. Calculates the distribution of colour histogram 
 		calColorHistogram(state[i].xCoor, state[i].yCoor, state[i].Hxt, state[i].Hyt,
@@ -586,8 +580,6 @@ int main(int argc, char *argv[]){
 	for (int i = 0; i < FRAME_INTERVAL; i++){
 		frame[i] = NULL;
 	}
-	IplImage *curFrameGray = NULL;
-	IplImage *frameGray = NULL;
 	Mat cameraFeed;
 	int row, col;
 	int star = 0;
@@ -642,7 +634,7 @@ int main(int argc, char *argv[]){
 				inRange(roi, Scalar(256, 256, 256), Scalar(256, 256, 256), roi);
 				//inRange(HSV, Scalar(H_MIN,S_MIN,V_MIN), Scalar(H_MAX,S_MAX,V_MAX), threshold);
 				//roi = Scalar(0, 255, 255);
-				vector< vector<Point> > contours;
+				vector<vector<Point>> contours;
 				vector<Vec4i> hierarchy;
 				//findContours(roi, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
 				//vector<RotatedRect> minRect( contours.size() ); //used to find bounding rectangle of sticker
@@ -675,13 +667,12 @@ int main(int argc, char *argv[]){
 		cvNamedWindow("Tracking", 1);
 		cvNamedWindow("ROI", 1);
 		imshow("ROI", image);
-
 		cvShowImage("Original Video",curframe);
 		cvShowImage("Tracking", imgTrack);
 		cvSetMouseCallback("Original Video", mouseHandler, 0);
 		char c = cvWaitKey(10);
 		switch (c) {
-			//Press ESC to exit program
+		//Press ESC to exit program
 		case 27:
 			return 0;
 			//case 'm':
@@ -725,8 +716,6 @@ int main(int argc, char *argv[]){
 			continue;
 		}
 	}
-	cvReleaseImage(&curFrameGray);
-	cvReleaseImage(&frameGray);
 	cvReleaseImage(&imgBackground);
 	cvReleaseImage(&imgForeground);
 	cvDestroyAllWindows();
