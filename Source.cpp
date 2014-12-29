@@ -299,7 +299,7 @@ void normalizeCumulatedWeight( float * weightedProb, float * cumulatedWeight, in
 /*
 Use binary search to find smallest index j where nCumuWeight[j] <= fixedRandomNum
 */
-int binarySearch( float fixedRandomNum, float * nCumuWeight, int size ){
+int binarySearch(float fixedRandomNum, float * nCumuWeight, int size ){
 	int leftIndex, rightIndex, middleIndex;
 	leftIndex = 0; 	
 	rightIndex = size-1;   
@@ -327,8 +327,8 @@ Puts indexes of resamples into array called resampleIndex
 void sampleImportance( float * c, int * resampleIndex, int N ){
 	float rand_num, * cumulatedWeight;
 	cumulatedWeight = new float [N+1]; // assign memory for the cumulated weight array with size N+1 
-	normalizeCumulatedWeight( c, cumulatedWeight, N ); // calculate the cumulated weight 
-	for ( int i = 0; i < N; i++ ) {
+	normalizeCumulatedWeight(c, cumulatedWeight, N ); // calculate the cumulated weight 
+	for (int i = 0; i < N; i++ ) {
 		rand_num = rand0_1();     
 		int j = binarySearch( rand_num, cumulatedWeight, N + 1 ); /* Find the smallest index j with value <=rnum */
 		if ( j == N ) {
@@ -345,12 +345,8 @@ Reselect N new samples from N input samples based on their weights
 Put values back into originalSampleSet
 */
 void reselectParticles( SPACESTATE * originalSampleSet, float * originalWeights, int numSamples ){
-	SPACESTATE * tempState;
-	int * reselectIndex;
-
-	tempState = new SPACESTATE[numSamples];
-	reselectIndex = new int[numSamples];
-
+	SPACESTATE * tempState = new SPACESTATE[numSamples];
+	int * reselectIndex = new int[numSamples];
 	sampleImportance( originalWeights, reselectIndex, numSamples ); // Resample according to weights 
 	for ( int i = 0; i < numSamples; i++ ){
 		tempState[i] = originalSampleSet[reselectIndex[i]];
@@ -364,16 +360,16 @@ void reselectParticles( SPACESTATE * originalSampleSet, float * originalWeights,
 }
 
 /*
-Propagation: Predict the system state values according to the system state equation.
+Propagation: Predicts the system state values according to the system state equation.
 The system equation is S(t) = A S(t-1) + W(t-1)
 where W(t-1) stands for the Gaussian noise.
-Puts predicted state into the state array after update
+Puts predicted state into the state array after update.
 */
 void propagate( SPACESTATE * state, int numStates ){
 	float randomNum[7];
 	/* Update every state within state[i] */
-	for ( int i = 0; i < numStates; i++ ){ /* Add a mean 0 random Gaussian noise */
-		for ( int j = 0; j < 7; j++ ) {
+	for (int i = 0; i < numStates; i++ ){ /* Add a mean 0 random Gaussian noise */
+		for (int j = 0; j < 7; j++ ) {
 			randomNum[j] = randGaussian( 0, (float)0.6 ); /*Produce seven random Gaussian numbers */
 		}
 		state[i].xCoor = (int)(state[i].xCoor + state[i].v_xt * DELTA_T + randomNum[0] * state[i].Hxt + 0.5);
@@ -389,35 +385,26 @@ void propagate( SPACESTATE * state, int numStates ){
 }
 
 /*
-Observe:
-According to the state set St of each sample and observing the histogram , and then
-update the estimation to get new weighted probabilities.
-Modifies the weight array directly
+Observe: Using the state set St of each sample and the observation from the histogram, 
+update the estimation to get new weighted probabilities. Modifies the weight array directly
 */
-void observe( SPACESTATE * state, float * weight, int size,
-			 unsigned char * image, int widthImg, int heightImg,
-			 float * objectHist, int hbins ){
-				 float * colorHist = new float[hbins];
-				 for (int i = 0; i < size; i++ ) {
-					 // 1. calculate the distribution of colour histogram 
-					 calColorHistogram(state[i].xCoor, state[i].yCoor, state[i].Hxt, state[i].Hyt,
-						 image, widthImg, heightImg, colorHist, hbins );
-					 // 2. Calculate the Bhattacharyya coefficient 
-					 float rho = calBhattacharyya(colorHist, objectHist, hbins );
-					 // 3. Calculate each weight values based on the Bhattachharyya coefficient
-					 weight[i] = calWeightedPi(rho);	
-				 }
-				 delete[] colorHist;
-				 return;	
+void observe( SPACESTATE * state, float * weight, int size, unsigned char * image, int widthImg, int heightImg, float * objectHist, int hbins ){
+	float * colorHist = new float[hbins];
+	for (int i = 0; i < size; i++ ) {
+		// 1. Calculates the distribution of colour histogram 
+		calColorHistogram(state[i].xCoor, state[i].yCoor, state[i].Hxt, state[i].Hyt,
+			image, widthImg, heightImg, colorHist, hbins );
+		// 2. Calculates the Bhattacharyya coefficient 
+		float rho = calBhattacharyya(colorHist, objectHist, hbins );
+		// 3. Calculates each weight values based on the Bhattachharyya coefficient
+		weight[i] = calWeightedPi(rho);	
+	}
+	delete[] colorHist;
+	return;	
 }
 
 /*
-Estimate (according to the weight) the state values to use as a tracking output 
-Input parameters：
-SPACESTATE * state：      state array
-float * weight：          corresponding weight
-Output parameters：
-SPACESTATE * EstState：   estimated state values
+Estimate (according to the weights) the values of the state to use as a tracking output 
 */
 void estimate( SPACESTATE * state, float * weight, int size, SPACESTATE & EstState ){
 	float at_dot, Hxt, Hyt, v_xt, v_yt, xCoor, yCoor, weight_sum;
@@ -440,7 +427,7 @@ void estimate( SPACESTATE * state, float * weight, int size, SPACESTATE & EstSta
 		yCoor += state[i].yCoor * weight[i];
 		weight_sum += weight[i];
 	}
-	/* Averaging */
+	// Averaging 
 	if ( weight_sum <= 0 ) {
 		weight_sum = 1; /* avoid division by 0*/
 	}
@@ -467,27 +454,26 @@ Output：
 float * targetHist：    updated target histogram
 ************************************************************/
 
-int updateModel( SPACESTATE EstState, float * targetHist, int bins, float PiT,
-				unsigned char * img, int widthImg, int heightImg ) {
-					float * estHist, bha, Pi_E;
-					int rvalue = -1;
-					estHist = new float [bins];
-					// 1.Calculate the estimated value of the target histogram 
-					calColorHistogram( EstState.xCoor, EstState.yCoor, EstState.Hxt, 
-						EstState.Hyt, img, widthImg, heightImg, estHist, bins );
-					// 2.calculate the Bhattacharyya coefficient 
-					bha  = calBhattacharyya( estHist, targetHist, bins );
-					// 3.Calculate the probability weights */
-					Pi_E = calWeightedPi( bha );
+int updateModel( SPACESTATE EstState, float * targetHist, int bins, float PiT, unsigned char * img, int widthImg, int heightImg ) {
+	float * estHist, bha, Pi_E;
+	int rvalue = -1;
+	estHist = new float [bins];
+	// 1.Calculate the estimated value of the target histogram 
+	calColorHistogram( EstState.xCoor, EstState.yCoor, EstState.Hxt, 
+		EstState.Hyt, img, widthImg, heightImg, estHist, bins );
+	// 2.calculate the Bhattacharyya coefficient 
+	bha  = calBhattacharyya( estHist, targetHist, bins );
+	// 3.Calculate the probability weights */
+	Pi_E = calWeightedPi( bha );
 
-					if ( Pi_E > PiT ) {
-						for ( int i = 0; i < bins; i++ ){
-							targetHist[i] = (float)((1.0 - ALPHA_COEFFICIENT) * targetHist[i] + ALPHA_COEFFICIENT * estHist[i]);
-						}
-						rvalue = 1;
-					}
-					delete[] estHist;
-					return rvalue ;
+	if ( Pi_E > PiT ) {
+		for ( int i = 0; i < bins; i++ ){
+			targetHist[i] = (float)((1.0 - ALPHA_COEFFICIENT) * targetHist[i] + ALPHA_COEFFICIENT * estHist[i]);
+		}
+		rvalue = 1;
+	}
+	delete[] estHist;
+	return rvalue ;
 }
 
 /*
@@ -552,13 +538,13 @@ void iplToImge(IplImage* src, int w,int h){
 }
 
 //Allow user to select area of interest
-void mouseHandler( int event , int x, int y, int flags, void* param){
+void mouseHandler( int event, int x, int y, int flags, void* param){
 	int centerX, centerY;
 	if (bSelectObject){
 		selection.x = MIN(x, origin.x);
 		selection.y = MIN(y, origin.y);
-		selection.width = abs( x - origin.x);
-		selection.height = abs( y - origin.y);
+		selection.width = abs(x - origin.x);
+		selection.height = abs(y - origin.y);
 	}
 	switch(event){
 	case CV_EVENT_LBUTTONDOWN:
@@ -573,7 +559,7 @@ void mouseHandler( int event , int x, int y, int flags, void* param){
 		centerY = selection.y + selection.height/ 2.0;
 		widthInput = selection.width / 2;
 		heightInput = selection.height / 2;
-		initialize( centerX, centerY, widthInput, heightInput, img, width, height );
+		initialize(centerX, centerY, widthInput, heightInput, img, width, height );
 		shouldTrackObject = true;
 		break;
 	}
@@ -581,37 +567,8 @@ void mouseHandler( int event , int x, int y, int flags, void* param){
 
 //use some of the openCV drawing functions to draw crosshairs on our tracked image
 void drawObject(int x, int y , int z){
-	int radius = 3;
 	Scalar colorText = Scalar(0, 255, 0);
 	cvCircle(imgTrack, Point(x, y), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
-
-	//cvCircle(imgTrack, Point(x, y), 3 , CV_RGB(255, 255, 0), 1, 4, 3 );
-
-	//circle(frame, Point(x, y), radius, colorText, 2);
-	int lengthOfStraightLines = 3 + 5;
-	/*if (y - lengthOfStraightLines > 0){
-	cvLine(imgTrack, Point(x, y), Point(x, y - lengthOfStraightLines), colorText, 2);
-	} else {
-	cvLine(imgTrack, Point(x, y), Point(x, 0), colorText, 2);
-	}
-	if (y + lengthOfStraightLines < FRAME_HEIGHT) {
-	cvLine(imgTrack, Point(x, y), Point(x, y + lengthOfStraightLines), colorText, 2);
-	} else {
-	cvLine(imgTrack, Point(x, y), Point(x, FRAME_HEIGHT), colorText, 2);
-	}
-	if(x - lengthOfStraightLines > 0) {
-	cvLine(imgTrack, Point(x, y), Point(x - lengthOfStraightLines, y), colorText, 2);
-	} else {
-	cvLine(imgTrack, Point(x, y), Point(0, y), colorText, 2);
-	}
-	if (x + lengthOfStraightLines < FRAME_WIDTH){
-	cvLine(imgTrack, Point(x, y), Point(x + lengthOfStraightLines, y), colorText, 2);
-	} else {
-	cvLine(imgTrack, Point(x, y), Point(FRAME_WIDTH, y), colorText, 2);
-	}*/
-	/*putText(frame, intToString(x) + "," + intToString(y) + "," + std::to_string(z), Point(x + 30, y + 30), 1, 1 , colorText, 2);
-	putText(frame, "radius is " + intToString(radius), Point(x + 60, y + 60), 1, 1 , colorText, 2);*/
-
 }
 
 int main(int argc, char *argv[]){
@@ -691,7 +648,7 @@ int main(int argc, char *argv[]){
 				//vector<RotatedRect> minRect( contours.size() ); //used to find bounding rectangle of sticker
 
 				/*for(int i = 0; i < roi.size(); ++i) {
-					drawContours(mat, candidates, i, Scalar(0,0,255), 1, CV_AA, hierarchy, 1, inflated_rect.tl());
+				drawContours(mat, candidates, i, Scalar(0,0,255), 1, CV_AA, hierarchy, 1, inflated_rect.tl());
 				}*/
 				//cvCircle(imgTrack, Point(xout, yout), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
 				drawObject(xout, yout, 0);
