@@ -383,7 +383,7 @@ void propagate( SPACESTATE * state, int numStates ){
 		state[i].Hxt = (int)(state[i].Hxt+state[i].Hxt*state[i].at_dot + randomNum[4] * SCALE_DISTURB + 0.5);
 		state[i].Hyt = (int)(state[i].Hyt+state[i].Hyt*state[i].at_dot + randomNum[5] * SCALE_DISTURB + 0.5);
 		state[i].at_dot = (float)(state[i].at_dot + randomNum[6] * SCALE_CHANGE_D);
-		cvCircle(imgTrack, Point(state[i].xCoor, state[i].yCoor), 3 , CV_RGB(255, 255, 0), 1, 4, 3 );
+		//cvCircle(imgTrack, Point(state[i].xCoor, state[i].yCoor), 3 , CV_RGB(255, 255, 0), 1, 4, 3 ); //to draw particle
 	}
 	return;
 }
@@ -506,34 +506,32 @@ void clearAll(){
 	return;
 }
 
-int trackColorParticle( unsigned char *image, int widthImg, int heightImg, 
-					   int &xCoor, int &yCoor, int &Wx_h, int &Hy_h,
-					   float &max_weight ) {
-						   SPACESTATE EstimatedState;
-						   reselectParticles( states, weights, NUM_PARTICLE );
-						   /* Sampling state equation to predict states variables or changes */
-						   propagate( states, NUM_PARTICLE);
-						   /* Observe and update the state and values */
-						   observe( states, weights, NUM_PARTICLE, image, widthImg, heightImg, modelHist, nbin );
-						   /* Estimate the position from the states values */
-						   estimate( states, weights, NUM_PARTICLE, EstimatedState );
-						   xCoor = EstimatedState.xCoor;
-						   yCoor = EstimatedState.yCoor;
-						   Wx_h = EstimatedState.Hxt;
-						   Hy_h = EstimatedState.Hyt;
-						   // update the model 
-						   updateModel( EstimatedState, modelHist, nbin, weightThreshold, image, widthImg, heightImg );
-						   // calculate the maximum weight 
-						   max_weight = weights[0];
-						   for ( int i = 1; i < NUM_PARTICLE; i++ ){
-							   max_weight = max_weight > weights[i] ?  max_weight: weights[i];
-						   }
-						   // Test for validity
-						   if ( xCoor < 0 || yCoor < 0 || xCoor >= widthImg || yCoor >= heightImg || Wx_h <= 0 || Hy_h <= 0 ) {
-							   return -1 ;
-						   } else {
-							   return 1 ;		
-						   }
+int trackColorParticle( unsigned char *image, int widthImg, int heightImg, int &xCoor, int &yCoor, int &Wx_h, int &Hy_h, float &max_weight ) {
+	SPACESTATE EstimatedState;
+	reselectParticles( states, weights, NUM_PARTICLE );
+	/* Sampling state equation to predict states variables or changes */
+	propagate( states, NUM_PARTICLE);
+	/* Observe and update the state and values */
+	observe( states, weights, NUM_PARTICLE, image, widthImg, heightImg, modelHist, nbin );
+	/* Estimate the position from the states values */
+	estimate( states, weights, NUM_PARTICLE, EstimatedState );
+	xCoor = EstimatedState.xCoor;
+	yCoor = EstimatedState.yCoor;
+	Wx_h = EstimatedState.Hxt;
+	Hy_h = EstimatedState.Hyt;
+	// update the model 
+	updateModel( EstimatedState, modelHist, nbin, weightThreshold, image, widthImg, heightImg );
+	// calculate the maximum weight 
+	max_weight = weights[0];
+	for ( int i = 1; i < NUM_PARTICLE; i++ ){
+		max_weight = max_weight > weights[i] ?  max_weight: weights[i];
+	}
+	// Test for validity
+	if ( xCoor < 0 || yCoor < 0 || xCoor >= widthImg || yCoor >= heightImg || Wx_h <= 0 || Hy_h <= 0 ) {
+		return -1 ;
+	} else {
+		return 1 ;		
+	}
 }
 
 string intToString(int number){
@@ -628,14 +626,12 @@ int main(int argc, char *argv[]){
 	IplImage* frame[FRAME_INTERVAL]; //to store frames
 	float rho_v;//represents similarity level
 	float max_weight;
-	int sum = 0;    //value of two frames after comparison
 	for (int i = 0; i < FRAME_INTERVAL; i++){
 		frame[i] = NULL;
 	}
 	IplImage *curFrameGray = NULL;
 	IplImage *frameGray = NULL;
 	Mat cameraFeed;
-	CvMat *matDynamic, *matFrameDiff;   //Dynamic matrix and matrix after frame difference
 	int row, col;
 	int star = 0;
 
@@ -659,21 +655,9 @@ int main(int argc, char *argv[]){
 		remap(temp, undistorted, map1, map2, INTER_LINEAR, 0, 0);
 		curframe = new IplImage(undistorted);
 		if (!star) {
-			curFrameGray = cvCreateImage(cvGetSize(curframe),IPL_DEPTH_8U,1);
-			frameGray = cvCreateImage(cvGetSize(curframe),IPL_DEPTH_8U,1);
-			imgBackground = cvCreateImage(cvGetSize(curframe),IPL_DEPTH_8U,1);
-			imgForeground = cvCreateImage(cvGetSize(curframe),IPL_DEPTH_8U,1);
-			imgTrack = cvCreateImage(cvGetSize(curframe),IPL_DEPTH_8U,3);
-
-			cvSetZero(imgForeground);  
-			cvCvtColor(curframe, imgBackground, CV_RGB2GRAY);
-
+			imgTrack = cvCreateImage(cvGetSize(curframe), IPL_DEPTH_8U, 3);
 			row = curframe -> height;
 			col = curframe -> width;
-			matDynamic = cvCreateMat(row, col, CV_32FC1);
-			cvSetZero(matDynamic);  
-			matFrameDiff = cvCreateMat(row, col, CV_32FC1);
-			cvSetZero(matFrameDiff);
 			width = curframe -> width;
 			height = curframe -> height; 
 			img = new unsigned char [width * height * 3];
@@ -693,24 +677,26 @@ int main(int argc, char *argv[]){
 				int xTopRight = xout + widthOutput;
 				int yTopLeft =  yout - heightOutput;
 				int yTopRight = yout + heightOutput;
-				cvRectangle(
-					imgTrack, 
-					cvPoint(xTopLeft, yTopLeft),
-					cvPoint(xTopRight, yTopRight),
-					cvScalar(255,0,0),
-					2,
-					8,
-					0);
+				cvRectangle(imgTrack, cvPoint(xTopLeft, yTopLeft), cvPoint(xTopRight, yTopRight), cvScalar(255,0,0), 2, 8, 0);
 				cv::Rect const mask(xTopLeft, yTopLeft, 2 * widthOutput, 2 * heightOutput);
-				Mat roi(image, mask);
-				roi = Scalar(0,255,255);
+				Mat roi(imgTrack, mask);
+				cvtColor(roi, image, COLOR_BGR2HSV);
+				//filter HSV image between values and store filtered image to threshold matrix
+				inRange(roi, Scalar(256, 256, 256), Scalar(256, 256, 256), roi);
+				//inRange(HSV, Scalar(H_MIN,S_MIN,V_MIN), Scalar(H_MAX,S_MAX,V_MAX), threshold);
+				//roi = Scalar(0, 255, 255);
+				vector< vector<Point> > contours;
+				vector<Vec4i> hierarchy;
+				//findContours(roi, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
+				//vector<RotatedRect> minRect( contours.size() ); //used to find bounding rectangle of sticker
 
-				//cv::Mat roi = image(mask);
+				/*for(int i = 0; i < roi.size(); ++i) {
+					drawContours(mat, candidates, i, Scalar(0,0,255), 1, CV_AA, hierarchy, 1, inflated_rect.tl());
+				}*/
 				//cvCircle(imgTrack, Point(xout, yout), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
 				drawObject(xout, yout, 0);
 				CvFont font;
-				double hScale=1.0;
-				double vScale=1.0;
+				double hScale=1.0, vScale=1.0;
 				int    lineWidth=2;
 				cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale, vScale, 0, lineWidth);
 				std::string s =  std::to_string(xout) + ", " + std::to_string(yout);
@@ -726,6 +712,7 @@ int main(int argc, char *argv[]){
 			//{
 			//	cout<<"target lost"<<endl;
 			//}
+
 		}
 		cvNamedWindow("Original Video", 1);
 		cvNamedWindow("Tracking", 1);
@@ -780,7 +767,6 @@ int main(int argc, char *argv[]){
 		default:
 			continue;
 		}
-
 	}
 	cvReleaseImage(&curFrameGray);
 	cvReleaseImage(&frameGray);
