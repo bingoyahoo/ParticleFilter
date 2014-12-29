@@ -1,6 +1,6 @@
 ParticleFilter
 ==============
-This is an example of a Particle Filter using colour segmentation and OpenCV that I extended from this repository. Particle filter is a popular technique used in robot localization. I modified some of the code especially the statistical functions, mathematical expressions and added some comments in english.
+This is an example of a Particle Filter using colour segmentation and OpenCV that I extended from this repository https://github.com/lililqth/ParticleFilter. Particle filter is a popular technique used in robot localization. I modified some of the code especially the statistical functions, mathematical expressions and added some comments in english.
 
 Idea behind Particle Filter
 ---------
