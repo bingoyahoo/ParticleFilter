@@ -17,8 +17,8 @@ In reality
 -----
 Particle filters make use of a lot of probability. We make measurements and assign a higher weight to the more probable particles. We then resample the particle based on their weighted probabilities. Over time, the most consistent particles will survive and we will have successfully localized our robot.
 
-Based on my experience, particle filters seem more robost than simple colour segmentation/blob detection when used to track robots in different lighting conditions.
+Based on my experience, particle filters seem more robust than simple colour segmentation/blob detection when used to track robots in different lighting conditions.
 
 Note
 ------
-In my code, I calibrated the program to work with a GoPro camera. If you are working with a webcam, try removing the calls to initUndistortRectifyMap and remap.
+In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. If you are working with a webcam, try removing the calls to initUndistortRectifyMap and remap.
