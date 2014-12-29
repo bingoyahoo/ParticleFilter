@@ -35,6 +35,7 @@ using namespace cv;
 const string ID_CAM_GO_PRO = "http://10.5.5.9:8080/live/amba.m3u8";
 const int FRAME_WIDTH = 640;
 const int FRAME_HEIGHT = 480;
+# define ALPHA_COEFFICIENT      0.3     // refresh rate of target model bw 0.1  - 0.3 
 
 typedef struct __SpaceState {  
 	int xCoor;              
@@ -66,7 +67,7 @@ float VELOCITY_DISTURB = 40.0;  /* disturbance of velocity */
 float SCALE_DISTURB = 0.0;      /* disturbance of windows width and height */
 float SCALE_CHANGE_D = (float)0.001;   /* disturbance of scaling speed changes */
 
-int NUM_PARTICLE = 1500;       // For particle filter   
+int NUM_PARTICLE = 1000;       // For particle filter   
 float * modelHist = NULL; // Model of historgram 
 SPACESTATE * states = NULL;  // array for states 
 float * weights = NULL;   // weights of particles 
@@ -77,6 +78,9 @@ float MAX_WEIGHT_THRESHOLD = (float)0.0001;  // Maximum weight threshold，used 
 bool bSelectObject = false;
 Point origin;
 Rect selection;
+
+/*# define RECIP_SIGMA  3.98942280401  / * 1/(sqrt(2*pi)*sigma), here sigma = 0.1 * /*/
+# define SIGMA2       0.02           /* 2*sigma^2, here sigma = 0.1 */
 
 /*
 set random seed with the parameter specified or the system time.
@@ -106,14 +110,8 @@ int bins：             The values of the colour histogram R_BIN*G_BIN*B_BIN（I
 */
 void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, int W, int H,
 					   float * colorHist, int bins ){
-						   int x_begin, y_begin;  /* the coordinates of the upper left corner of the specified image area */
-						   int y_end, x_end;
-						   int x, y, i, index;
-						   int r, g, b;
-						   float k, r2, f;
-						   int a2;
 						   // Assign 0 to the values of the histogram​
-						   for ( i = 0; i < bins; i++ ){    
+						   for (int i = 0; i < bins; i++ ){    
 							   colorHist[i] = 0.0;
 						   }
 						   /* Consider the special scenario where x0, y0 are outside the image
@@ -122,37 +120,38 @@ void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, i
 							   || ( Wx <= 0 ) || ( Hy <= 0 ) ) {
 								   return;
 						   }
-						   x_begin = x0 - Wx;               /* Calculate the actual width and area starting point */
-						   y_begin = y0 - Hy;
+						   // the coordinates of the upper left corner of the specified image area
+						   int x_begin = x0 - Wx;               /* Calculate the actual width and area starting point */
+						   int y_begin = y0 - Hy;
 						   if ( x_begin < 0 ) {
 							   x_begin = 0;
 						   }
 						   if ( y_begin < 0 ) {
 							   y_begin = 0;
 						   }
-						   x_end = x0 + Wx;
-						   y_end = y0 + Hy;
+						   int x_end = x0 + Wx;
+						   int y_end = y0 + Hy;
 						   if ( x_end >= W ) {
-							   x_end = W-1;
+							   x_end = W - 1;
 						   }
 						   if ( y_end >= H ) {
-							   y_end = H-1;
+							   y_end = H - 1;
 						   }
-						   a2 = Wx * Wx + Hy * Hy;          // Calculate the radius squared kernel function a ^ 2 
-						   f = 0.0;                         // Normalization factor 
-						   for ( y = y_begin; y <= y_end; y++ ){
-							   for ( x = x_begin; x <= x_end; x++ ){
-								   r = image[(y*W+x)*3] >> R_SHIFT;   // Computing the histogram values 
-								   g = image[(y*W+x)*3+1] >> G_SHIFT; // shift values are according to R G B values 
-								   b = image[(y*W+x)*3+2] >> B_SHIFT;
-								   index = r * G_BIN * B_BIN + g * B_BIN + b;
-								   r2 = (float)(((y-y0) * (y-y0) + (x-x0) * (x-x0)) *1.0/ a2); // calculate radius squared r^2 
-								   k = 1 - r2;   // kernel value k(r) = 1-r^2, |r| < 1; other values k(r) = 0 
+						   int a2 = Wx * Wx + Hy * Hy;          // Calculate the radius squared kernel function a ^ 2 
+						   float f = 0.0;                         // Normalization factor 
+						   for (int y = y_begin; y <= y_end; y++ ){
+							   for (int x = x_begin; x <= x_end; x++ ){
+								   int r = image[(y * W + x)* 3] >> R_SHIFT;   // Computing the histogram values 
+								   int g = image[(y * W + x )* 3+1] >> G_SHIFT; // shift values are according to R G B values 
+								   int b = image[(y * W + x ) * 3+2] >> B_SHIFT;
+								   int index = r * G_BIN * B_BIN + g * B_BIN + b;
+								   float r2 = (float)(((y-y0) * (y-y0) + (x-x0) * (x-x0)) *1.0/ a2); // calculate radius squared r^2 
+								   float k = 1 - r2;   // kernel value k(r) = 1-r^2, |r| < 1; other values k(r) = 0 
 								   f = f + k;
 								   colorHist[index] = colorHist[index] + k;  // Calculate the nuclear density weighted color histogram 
 							   }
 						   }
-						   for ( i = 0; i < bins; i++ ) {    // Normalize the Histogram 
+						   for ( int i = 0; i < bins; i++ ) {    // Normalize the Histogram 
 							   colorHist[i] = colorHist[i]/f;
 						   }
 						   return;
@@ -174,13 +173,10 @@ float calBhattacharyya(float * p, float * q, int bins){
 	return rho ;
 }
 
-/*# define RECIP_SIGMA  3.98942280401  / * 1/(sqrt(2*pi)*sigma), here sigma = 0.1 * /*/
-# define SIGMA2       0.02           /* 2*sigma^2, here sigma = 0.1 */
 
 float calWeightedPi(float rho){
 	float pi_n, d2;
 	d2 = 1 - rho;
-	//pi_n = (float)(RECIP_SIGMA * exp( - d2/SIGMA2 ));
 	pi_n = (float)(exp( - d2/SIGMA2 ));
 	return pi_n;
 }
@@ -192,8 +188,8 @@ float ran0(long *idum){
 	long k;
 	float ans;
 	/* *idum ^= MASK;*/      /* XORing with MASK allows use of zero and other */
-	k=(*idum)/IQ;            /* simple bit patterns for idum.                 */
-	*idum=IA*(*idum-k*IQ)-IR*k;  /* Compute idum=(IA*idum) % IM without over- */
+	k = (*idum)/IQ;            /* simple bit patterns for idum.                 */
+	*idum = IA*(*idum-k*IQ)-IR*k;  /* Compute idum=(IA*idum) % IM without over- */
 	if (*idum < 0) {
 		*idum += IM;  /* flows by Schrage’s method.               */
 	}
@@ -221,12 +217,12 @@ float randGaussian( float u, float sigma){
 	normal distribution N~(0,1) 	
 	1. Produce random variables X1, X2 between 0 and 1
 	2. Calculate 
-	V1= 2*X1 - 1, 
-	V2= 2*X2 - 1, 
+	V1= 2 * X1 - 1, 
+	V2= 2 * X2 - 1, 
 	s = V1^2 + V2^2
 	3. If s <= 1, go to step 4 , otherwise return to step 1
-	4. Calculate A = (-2ln(s)/s)^(1/2), y1 = V1*A, y2 = V2 * A
-	y1,y2 follows N~(0,1) random variable
+	4. Calculate A = (-2ln(s)/s) ^ (1/2), y1 = V1 * A, y2 = V2 * A
+	y1, y2 follows N ~ (0,1) random variable
 	*/
 	while ( s > 1.0 ){
 		x1 = rand0_1();
@@ -238,11 +234,10 @@ float randGaussian( float u, float sigma){
 	y = (float)(sqrt( -2.0 * log(s)/s ) * v1);
 	/*
 	According to the formula
-	z = sigma * y + u, <-- zy: this formula seems wrong
+	z = ( y - u )/ sqrt(sigma)
 	normalize y variable into a standard normal distrbution Z ~ N(u, sigma)
 	*/
 	return( y - u )/ sqrt(sigma);	
-	//return( sigma * y + u );	
 }
 
 /*
@@ -271,7 +266,6 @@ int initialize(int x0, int y0, int Wx, int Hy,
 				   }
 				   /* Calculation of model target histogram */
 				   calColorHistogram( x0, y0, Wx, Hy, img, W, H, modelHist, nbin );
-
 				   /* Initialize particle state with x0, y0, 1, 1, Wx, Hy, 0.1
 				   taking center of Normal Distribution to be N(0, 0.4) */
 				   states[0].xCoor = x0;
@@ -281,7 +275,7 @@ int initialize(int x0, int y0, int Wx, int Hy,
 				   states[0].Hxt = Wx;
 				   states[0].Hyt = Hy;
 				   states[0].at_dot = (float) 0.0; 
-				   weights[0] = (float)(1.0/NUM_PARTICLE); 
+				   weights[0] = (float)(1.0/ NUM_PARTICLE); 
 				   for ( int i = 1; i < NUM_PARTICLE; i++ ) {
 					   for ( int j = 0; j < 7; j++ ) {
 						   random[j] = randGaussian( 0, (float)0.6 ); /* Produce seven random Gaussian numbers */
@@ -294,7 +288,7 @@ int initialize(int x0, int y0, int Wx, int Hy,
 					   states[i].Hyt = (int)( states[0].Hyt + random[5] * SCALE_DISTURB );
 					   states[i].at_dot = (float)( states[0].at_dot + random[6] * SCALE_CHANGE_D );
 					   /* average weight is 1/N, because all particles  have equal probability*/
-					   weights[i] = (float)(1.0/NUM_PARTICLE);
+					   weights[i] = (float)(1.0 / NUM_PARTICLE);
 				   }
 				   return 1;
 }
@@ -381,7 +375,7 @@ void reselectParticles( SPACESTATE * originalSampleSet, float * originalWeights,
 }
 
 /*
-Propagation: Predict the system state valueus according to the system state equation.
+Propagation: Predict the system state values according to the system state equation.
 The system equation is S(t) = A S(t-1) + W(t-1)
 where W(t-1) stands for the Gaussian noise.
 Puts predicted state into the state array after update
@@ -414,8 +408,7 @@ Modifies the weight array directly
 void observe( SPACESTATE * state, float * weight, int size,
 			 unsigned char * image, int widthImg, int heightImg,
 			 float * objectHist, int hbins ){
-				 float * colorHist;
-				 colorHist = new float[hbins];
+				 float * colorHist = new float[hbins];
 				 for (int i = 0; i < size; i++ ) {
 					 // 1. calculate the distribution of colour histogram 
 					 calColorHistogram(state[i].xCoor, state[i].yCoor, state[i].Hxt, state[i].Hyt,
@@ -434,13 +427,11 @@ Estimate (according to the weight) the state values to use as a tracking output
 Input parameters：
 SPACESTATE * state：      state array
 float * weight：          corresponding weight
-int N：                   state array dimension
 Output parameters：
 SPACESTATE * EstState：   estimated state values
 */
 void estimate( SPACESTATE * state, float * weight, int size, SPACESTATE & EstState ){
-	float at_dot, Hxt, Hyt, v_xt, v_yt, xCoor, yCoor;
-	float weight_sum;
+	float at_dot, Hxt, Hyt, v_xt, v_yt, xCoor, yCoor, weight_sum;
 	at_dot = 0;
 	Hxt = 0; 
 	Hyt = 0;
@@ -464,13 +455,13 @@ void estimate( SPACESTATE * state, float * weight, int size, SPACESTATE & EstSta
 	if ( weight_sum <= 0 ) {
 		weight_sum = 1; /* avoid division by 0*/
 	}
-	EstState.at_dot = at_dot/weight_sum;
-	EstState.Hxt = (int)(Hxt/weight_sum + 0.5 );
-	EstState.Hyt = (int)(Hyt/weight_sum + 0.5 );
-	EstState.v_xt = v_xt/weight_sum;
-	EstState.v_yt = v_yt/weight_sum;
-	EstState.xCoor = (int)(xCoor/weight_sum + 0.5 );
-	EstState.yCoor = (int)(yCoor/weight_sum + 0.5 );
+	EstState.at_dot = at_dot / weight_sum;
+	EstState.Hxt = (int)(Hxt / weight_sum + 0.5 );
+	EstState.Hyt = (int)(Hyt / weight_sum + 0.5 );
+	EstState.v_xt = v_xt / weight_sum;
+	EstState.v_yt = v_yt / weight_sum;
+	EstState.xCoor = (int)(xCoor / weight_sum + 0.5 );
+	EstState.yCoor = (int)(yCoor / weight_sum + 0.5 );
 	return;
 }
 
@@ -486,7 +477,6 @@ int width, height:		image width and height
 Output：
 float * targetHist：    updated target histogram
 ************************************************************/
-# define ALPHA_COEFFICIENT      0.2     // refresh rate of target model bw 0.1  - 0.3 
 
 int updateModel( SPACESTATE EstState, float * targetHist, int bins, float PiT,
 				unsigned char * img, int widthImg, int heightImg ) {
@@ -800,7 +790,10 @@ int main(int argc, char *argv[]){
 				std::cout << "Tracking disabled" << std::endl;
 			}
 			break;
+		default:
+			continue;
 		}
+		
 	}
 	cvReleaseImage(&curFrameGray);
 	cvReleaseImage(&frameGray);
