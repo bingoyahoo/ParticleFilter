@@ -18,9 +18,6 @@ using namespace cv;
 #define  T 40    //Tf
 #define Re 30     //
 
-#define CONTOUR_MAX_AREA 10000
-#define CONTOUR_MIN_AREA 50
-
 #define R_BIN      8  // Histogram RED 
 #define G_BIN      8  // Histogram GREEN 
 #define B_BIN      8  // Histogram BLUE  
@@ -69,7 +66,7 @@ float VELOCITY_DISTURB = 40.0;  /* disturbance of velocity */
 float SCALE_DISTURB = 0.0;      /* disturbance of windows width and height */
 float SCALE_CHANGE_D = (float)0.001;   /* disturbance of scaling speed changes */
 
-int numParticles = 1500;       // For particle filter   
+int NUM_PARTICLE = 1500;       // For particle filter   
 float * modelHist = NULL; // Model of historgram 
 SPACESTATE * states = NULL;  // array for states 
 float * weights = NULL;   // weights of particles 
@@ -259,11 +256,11 @@ int initialize(int x0, int y0, int Wx, int Hy,
 			   unsigned char * img, int W, int H ){
 				   float random[7];
 				   setSeed(0); /* for random */
-				   states = new SPACESTATE [numParticles]; // assign memory for statespace array 
+				   states = new SPACESTATE [NUM_PARTICLE]; // assign memory for statespace array 
 				   if ( states == NULL ) {
 					   return -2;
 				   }
-				   weights = new float [numParticles];     // assign memory for weight array
+				   weights = new float [NUM_PARTICLE];     // assign memory for weight array
 				   if ( weights == NULL ) {
 					   return -3;	
 				   }
@@ -284,8 +281,8 @@ int initialize(int x0, int y0, int Wx, int Hy,
 				   states[0].Hxt = Wx;
 				   states[0].Hyt = Hy;
 				   states[0].at_dot = (float) 0.0; 
-				   weights[0] = (float)(1.0/numParticles); 
-				   for ( int i = 1; i < numParticles; i++ ) {
+				   weights[0] = (float)(1.0/NUM_PARTICLE); 
+				   for ( int i = 1; i < NUM_PARTICLE; i++ ) {
 					   for ( int j = 0; j < 7; j++ ) {
 						   random[j] = randGaussian( 0, (float)0.6 ); /* Produce seven random Gaussian numbers */
 					   }
@@ -297,7 +294,7 @@ int initialize(int x0, int y0, int Wx, int Hy,
 					   states[i].Hyt = (int)( states[0].Hyt + random[5] * SCALE_DISTURB );
 					   states[i].at_dot = (float)( states[0].at_dot + random[6] * SCALE_CHANGE_D );
 					   /* average weight is 1/N, because all particles  have equal probability*/
-					   weights[i] = (float)(1.0/numParticles);
+					   weights[i] = (float)(1.0/NUM_PARTICLE);
 				   }
 				   return 1;
 }
@@ -534,13 +531,13 @@ int trackColorParticle( unsigned char *image, int widthImg, int heightImg,
 					   int &xCoor, int &yCoor, int &Wx_h, int &Hy_h,
 					   float &max_weight ) {
 						   SPACESTATE EstimatedState;
-						   reselectParticles( states, weights, numParticles );
+						   reselectParticles( states, weights, NUM_PARTICLE );
 						   /* Sampling state equation to predict states variables or changes */
-						   propagate( states, numParticles);
+						   propagate( states, NUM_PARTICLE);
 						   /* Observe and update the state and values */
-						   observe( states, weights, numParticles, image, widthImg, heightImg, modelHist, nbin );
+						   observe( states, weights, NUM_PARTICLE, image, widthImg, heightImg, modelHist, nbin );
 						   /* Estimate the position from the states values */
-						   estimate( states, weights, numParticles, EstimatedState );
+						   estimate( states, weights, NUM_PARTICLE, EstimatedState );
 						   xCoor = EstimatedState.xCoor;
 						   yCoor = EstimatedState.yCoor;
 						   Wx_h = EstimatedState.Hxt;
@@ -549,7 +546,7 @@ int trackColorParticle( unsigned char *image, int widthImg, int heightImg,
 						   updateModel( EstimatedState, modelHist, nbin, weightThreshold, image, widthImg, heightImg );
 						   // calculate the maximum weight 
 						   max_weight = weights[0];
-						   for ( int i = 1; i < numParticles; i++ ){
+						   for ( int i = 1; i < NUM_PARTICLE; i++ ){
 							   max_weight = max_weight > weights[i] ?  max_weight: weights[i];
 						   }
 						   // Test for validity
@@ -588,15 +585,15 @@ void mouseHandler( int event , int x, int y, int flags, void* param){
 	}
 	switch(event){
 	case CV_EVENT_LBUTTONDOWN:
-		origin  = Point(x,y);
-		selection = Rect(x,y,0,0);
+		origin  = Point(x, y);
+		selection = Rect(x, y, 0, 0);
 		bSelectObject = true;
 		isProgramPaused = false;
 		break;
 	case CV_EVENT_LBUTTONUP:
 		bSelectObject = false;
-		centerX = selection.x + selection.width/2.0;
-		centerY = selection.y + selection.height/2.0;
+		centerX = selection.x + selection.width/ 2.0;
+		centerY = selection.y + selection.height/ 2.0;
 		widthInput = selection.width / 2;
 		heightInput = selection.height / 2;
 		initialize( centerX, centerY, widthInput, heightInput, img, width, height );
@@ -606,32 +603,34 @@ void mouseHandler( int event , int x, int y, int flags, void* param){
 }
 
 //use some of the openCV drawing functions to draw crosshairs on our tracked image
-void drawObject(IplImage &frame, int x, int y , int z){
+void drawObject(int x, int y , int z){
 		int radius = 3;
 		Scalar colorText = Scalar(0, 255, 0);
-		cvCircle(imgTrack, Point(x, y), 3 , CV_RGB(255, 255, 0), 1, 4, 3 );
+		cvCircle(imgTrack, Point(x, y), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
 
-		/*circle(frame, Point(x, y), radius, colorText, 2);
-		int lengthOfStraightLines = radius + 5;
-		if (y - lengthOfStraightLines > 0){
-			line(frame, Point(x, y), Point(x, y - lengthOfStraightLines), colorText, 2);
+		//cvCircle(imgTrack, Point(x, y), 3 , CV_RGB(255, 255, 0), 1, 4, 3 );
+
+		//circle(frame, Point(x, y), radius, colorText, 2);
+		int lengthOfStraightLines = 3 + 5;
+		/*if (y - lengthOfStraightLines > 0){
+			cvLine(imgTrack, Point(x, y), Point(x, y - lengthOfStraightLines), colorText, 2);
 		} else {
-			line(frame, Point(x, y), Point(x, 0), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(x, 0), colorText, 2);
 		}
 		if (y + lengthOfStraightLines < FRAME_HEIGHT) {
-			line(frame, Point(x, y), Point(x, y + lengthOfStraightLines), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(x, y + lengthOfStraightLines), colorText, 2);
 		} else {
-			line(frame, Point(x, y), Point(x, FRAME_HEIGHT), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(x, FRAME_HEIGHT), colorText, 2);
 		}
 		if(x - lengthOfStraightLines > 0) {
-			line(frame, Point(x, y), Point(x - lengthOfStraightLines, y), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(x - lengthOfStraightLines, y), colorText, 2);
 		} else {
-			line(frame, Point(x, y), Point(0, y), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(0, y), colorText, 2);
 		}
 		if (x + lengthOfStraightLines < FRAME_WIDTH){
-			line(frame, Point(x, y), Point(x + lengthOfStraightLines, y), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(x + lengthOfStraightLines, y), colorText, 2);
 		} else {
-			line(frame, Point(x, y), Point(FRAME_WIDTH, y), colorText, 2);
+			cvLine(imgTrack, Point(x, y), Point(FRAME_WIDTH, y), colorText, 2);
 		}*/
 		/*putText(frame, intToString(x) + "," + intToString(y) + "," + std::to_string(z), Point(x + 30, y + 30), 1, 1 , colorText, 2);
 		putText(frame, "radius is " + intToString(radius), Point(x + 60, y + 60), 1, 1 , colorText, 2);*/
@@ -640,7 +639,6 @@ void drawObject(IplImage &frame, int x, int y , int z){
 
 int main(int argc, char *argv[]){
 	VideoCapture capture;
-
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
 		//capture.open(ID_CAM_GO_PRO);
 		capture.open(0);
@@ -661,8 +659,6 @@ int main(int argc, char *argv[]){
 	Mat cameraFeed;
 	CvMat *matDynamic, *matFrameDiff;   //Dynamic matrix and matrix after frame difference
 	int row, col;
-	cvNamedWindow("Original Video", 1);
-	cvNamedWindow("Tracking", 1);
 	int star = 0;
 
 	capture.set(CV_CAP_PROP_FRAME_WIDTH, FRAME_WIDTH);
@@ -674,13 +670,13 @@ int main(int argc, char *argv[]){
 	fs["Camera_Matrix"] >> camera_matrix;
 	fs.release();
 	Mat empty, newCameraMatrix, map1, map2, undistorted;
-
 	capture.read(cameraFeed);
 	Size imageSize = cameraFeed.size();
 	initUndistortRectifyMap(camera_matrix, distortion_coeff, empty, newCameraMatrix, imageSize,
 		CV_32FC1, map1, map2);
 
 	while (1){
+		Mat image(Size(FRAME_WIDTH, FRAME_HEIGHT), CV_8UC3);
 		capture.read(cameraFeed);
 		Mat temp = cameraFeed.clone();
 		remap(temp, undistorted, map1, map2, INTER_LINEAR, 0, 0);
@@ -715,26 +711,35 @@ int main(int argc, char *argv[]){
 			//if ( rho_v > 0 && max_weight > 0.0001 ) { /* determines if target is lost */
 			if (rho_v > 0 ){
 				//Drawing rectangle based on stored xout and yout values.
+				//We make the bounding rectangle bigger than actual size to do processing on it.
+				int xTopLeft = xout - widthOutput;
+				int xTopRight = xout + widthOutput;
+				int yTopLeft =  yout - heightOutput;
+				int yTopRight = yout + heightOutput;
 				cvRectangle(
 					imgTrack, 
-					cvPoint(xout - widthOutput, yout - heightOutput),
-					cvPoint(xout + widthOutput, yout + heightOutput),
+					cvPoint(xTopLeft, yTopLeft),
+					cvPoint(xTopRight, yTopRight),
 					cvScalar(255,0,0),
 					2,
 					8,
 					0);
-				cvCircle(imgTrack, Point(xout, yout), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
-				//drawObject(imgTrack, xout, yout, 0);
+				cv::Rect const mask(xTopLeft, yTopLeft, 2 * widthOutput, 2 * heightOutput);
+				Mat roi(image, mask);
+				roi = Scalar(0,255,255);
+
+				//cv::Mat roi = image(mask);
+				//cvCircle(imgTrack, Point(xout, yout), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
+				drawObject(xout, yout, 0);
 				CvFont font;
 				double hScale=1.0;
 				double vScale=1.0;
 				int    lineWidth=2;
-				cvInitFont(&font,CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale,vScale,0,lineWidth);
+				cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale, vScale, 0, lineWidth);
 				std::string s =  std::to_string(xout) + ", " + std::to_string(yout);
 				char* c = new char[s.length() + 1];
 				strcpy_s(c, 10, s.c_str());
 				cvPutText (imgTrack, c , cvPoint(30, 30), &font, cvScalar(255,255,0));
-				//cvPutText(imgTrack, intToString(x) + "," + intToString(y) + "," + std::to_string(z), Point(x + 30, y + 30), 1, 1 , colorText, 2);
 				xin = xout; //for next frame
 				yin = yout;
 				widthInput = widthOutput; 
@@ -745,26 +750,29 @@ int main(int argc, char *argv[]){
 			//	cout<<"target lost"<<endl;
 			//}
 		}
-		/*imshow("Original Video",curframe);
-		imshow("Tracking", imgTrack);*/
+		cvNamedWindow("Original Video", 1);
+		cvNamedWindow("Tracking", 1);
+		cvNamedWindow("ROI", 1);
+		imshow("ROI", image);
+
 		cvShowImage("Original Video",curframe);
 		cvShowImage("Tracking", imgTrack);
 		cvSetMouseCallback("Original Video", mouseHandler, 0);
 		char c = cvWaitKey(10);
 		switch (c) {
-			//Press ESC to exit program
+		//Press ESC to exit program
 		case 27:
 			return 0;
-			//case 'm':
-			//case 'M':
-			//	shouldUseMorphOps = !shouldUseMorphOps;
-			//	if (shouldUseMorphOps) {
-			//		std::cout << MSG_MORPHING_ENABLED << std::endl;
-			//	} else {
-			//		std::cout << MSG_MORPHING_DISABLED << std::endl;
-			//	}
-			//	break;
-			//Press P to pause or resume the code
+		//case 'm':
+		//case 'M':
+		//	shouldUseMorphOps = !shouldUseMorphOps;
+		//	if (shouldUseMorphOps) {
+		//		std::cout << MSG_MORPHING_ENABLED << std::endl;
+		//	} else {
+		//		std::cout << MSG_MORPHING_DISABLED << std::endl;
+		//	}
+		//	break;
+		//Press P to pause or resume the code
 		case 'p': 
 		case 'P':
 			isProgramPaused = !isProgramPaused;
