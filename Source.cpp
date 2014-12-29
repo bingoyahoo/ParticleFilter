@@ -79,7 +79,6 @@ bool bSelectObject = false;
 Point origin;
 Rect selection;
 
-/*# define RECIP_SIGMA  3.98942280401  / * 1/(sqrt(2*pi)*sigma), here sigma = 0.1 * /*/
 # define SIGMA2       0.02           /* 2*sigma^2, here sigma = 0.1 */
 
 /*
@@ -108,53 +107,51 @@ float * colorHist：    Color histogram，colour index：
 i = r * G_BIN * B_BIN + g * B_BIN + b arrangement
 int bins：             The values of the colour histogram R_BIN*G_BIN*B_BIN（It is 8x8x8=512 here）
 */
-void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, int W, int H,
-					   float * colorHist, int bins ){
-						   // Assign 0 to the values of the histogram​
-						   for (int i = 0; i < bins; i++ ){    
-							   colorHist[i] = 0.0;
-						   }
-						   /* Consider the special scenario where x0, y0 are outside the image
-						   or Wx<=0, Hy<=0. Set the colour histogram to be 0 in such cases*/
-						   if ( ( x0 < 0 ) || (x0 >= W) || ( y0 < 0 ) || ( y0 >= H ) 
-							   || ( Wx <= 0 ) || ( Hy <= 0 ) ) {
-								   return;
-						   }
-						   // the coordinates of the upper left corner of the specified image area
-						   int x_begin = x0 - Wx;               /* Calculate the actual width and area starting point */
-						   int y_begin = y0 - Hy;
-						   if ( x_begin < 0 ) {
-							   x_begin = 0;
-						   }
-						   if ( y_begin < 0 ) {
-							   y_begin = 0;
-						   }
-						   int x_end = x0 + Wx;
-						   int y_end = y0 + Hy;
-						   if ( x_end >= W ) {
-							   x_end = W - 1;
-						   }
-						   if ( y_end >= H ) {
-							   y_end = H - 1;
-						   }
-						   int a2 = Wx * Wx + Hy * Hy;          // Calculate the radius squared kernel function a ^ 2 
-						   float f = 0.0;                         // Normalization factor 
-						   for (int y = y_begin; y <= y_end; y++ ){
-							   for (int x = x_begin; x <= x_end; x++ ){
-								   int r = image[(y * W + x)* 3] >> R_SHIFT;   // Computing the histogram values 
-								   int g = image[(y * W + x )* 3+1] >> G_SHIFT; // shift values are according to R G B values 
-								   int b = image[(y * W + x ) * 3+2] >> B_SHIFT;
-								   int index = r * G_BIN * B_BIN + g * B_BIN + b;
-								   float r2 = (float)(((y-y0) * (y-y0) + (x-x0) * (x-x0)) *1.0/ a2); // calculate radius squared r^2 
-								   float k = 1 - r2;   // kernel value k(r) = 1-r^2, |r| < 1; other values k(r) = 0 
-								   f = f + k;
-								   colorHist[index] = colorHist[index] + k;  // Calculate the nuclear density weighted color histogram 
-							   }
-						   }
-						   for ( int i = 0; i < bins; i++ ) {    // Normalize the Histogram 
-							   colorHist[i] = colorHist[i]/f;
-						   }
-						   return;
+void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, int W, int H, float * colorHist, int bins ){
+	// Assign 0 to the values of the histogram​
+	for (int i = 0; i < bins; i++ ){    
+		colorHist[i] = 0.0;
+	}
+	/* Consider the special scenario where x0, y0 are outside the image
+	or Wx<=0, Hy<=0. Set the colour histogram to be 0 in such cases*/
+	if ( ( x0 < 0 ) || (x0 >= W) || ( y0 < 0 ) || ( y0 >= H ) || ( Wx <= 0 ) || ( Hy <= 0 ) ) {
+		return;
+	}
+	// the coordinates of the upper left corner of the specified image area
+	int x_begin = x0 - Wx;               /* Calculate the actual width and area starting point */
+	int y_begin = y0 - Hy;
+	if ( x_begin < 0 ) {
+		x_begin = 0;
+	}
+	if ( y_begin < 0 ) {
+		y_begin = 0;
+	}
+	int x_end = x0 + Wx;
+	int y_end = y0 + Hy;
+	if ( x_end >= W ) {
+		x_end = W - 1;
+	}
+	if ( y_end >= H ) {
+		y_end = H - 1;
+	}
+	int a2 = Wx * Wx + Hy * Hy;          // Calculate the radius squared kernel function a ^ 2 
+	float f = 0.0;                         // Normalization factor 
+	for (int y = y_begin; y <= y_end; y++ ){
+		for (int x = x_begin; x <= x_end; x++ ){
+			int r = image[(y * W + x)* 3] >> R_SHIFT;   // Computing the histogram values 
+			int g = image[(y * W + x )* 3+1] >> G_SHIFT; // shift values are according to R G B values 
+			int b = image[(y * W + x ) * 3+2] >> B_SHIFT;
+			int index = r * G_BIN * B_BIN + g * B_BIN + b;
+			float r2 = (float)(((y-y0) * (y-y0) + (x-x0) * (x-x0)) *1.0/ a2); // calculate radius squared r^2 
+			float k = 1 - r2;   // kernel value k(r) = 1-r^2, |r| < 1; other values k(r) = 0 
+			f = f + k;
+			colorHist[index] = colorHist[index] + k;  // Calculate the nuclear density weighted color histogram 
+		}
+	}
+	for ( int i = 0; i < bins; i++ ) {    // Normalize the Histogram 
+		colorHist[i] = colorHist[i]/f;
+	}
+	return;
 }
 
 /*
@@ -173,7 +170,6 @@ float calBhattacharyya(float * p, float * q, int bins){
 	return rho ;
 }
 
-
 float calWeightedPi(float rho){
 	float pi_n, d2;
 	d2 = 1 - rho;
@@ -185,29 +181,23 @@ float calWeightedPi(float rho){
 Generating a pseudo-random number between [0, 1] using Park and Miller method
 */
 float ran0(long *idum){
-	long k;
-	float ans;
 	/* *idum ^= MASK;*/      /* XORing with MASK allows use of zero and other */
-	k = (*idum)/IQ;            /* simple bit patterns for idum.                 */
+	long k = (*idum)/IQ;            /* simple bit patterns for idum.                 */
 	*idum = IA*(*idum-k*IQ)-IR*k;  /* Compute idum=(IA*idum) % IM without over- */
 	if (*idum < 0) {
 		*idum += IM;  /* flows by Schrage’s method.               */
 	}
-	ans = AM * (*idum);          /* Convert idum to a floating result.            */
+	float ans = AM * (*idum);          /* Convert idum to a floating result.            */
 	/* *idum ^= MASK;*/      /* Unmask before return.                         */
 	return ans;
 }
 
-/*
-Return a random floating number between 0, 1
-*/
+//Return a random floating number between 0, 1
 float rand0_1(){
 	return( ran0( &ran_seed ) );
 }
 
-/*
-Return a random value from a Gaussian distrbution x ~ N(u, sigma)
-*/
+//Return a random value from a Gaussian distrbution x ~ N(u, sigma)
 float randGaussian( float u, float sigma){
 	float x1, x2, v1, v2;
 	float s = 100.0;
@@ -229,7 +219,7 @@ float randGaussian( float u, float sigma){
 		x2 = rand0_1();
 		v1 = 2 * x1 - 1;
 		v2 = 2 * x2 - 1;
-		s = v1*v1 + v2*v2;
+		s = v1 * v1 + v2 * v2;
 	}
 	y = (float)(sqrt( -2.0 * log(s)/s ) * v1);
 	/*
@@ -247,50 +237,49 @@ int Wx, Hy：        target width and height
 unsigned char * img：	Image in RGB
 int W, H：          image width and height
 */
-int initialize(int x0, int y0, int Wx, int Hy,
-			   unsigned char * img, int W, int H ){
-				   float random[7];
-				   setSeed(0); /* for random */
-				   states = new SPACESTATE [NUM_PARTICLE]; // assign memory for statespace array 
-				   if ( states == NULL ) {
-					   return -2;
-				   }
-				   weights = new float [NUM_PARTICLE];     // assign memory for weight array
-				   if ( weights == NULL ) {
-					   return -3;	
-				   }
-				   nbin = R_BIN * G_BIN * B_BIN; /* Determine the values of histogram */
-				   modelHist = new float [nbin]; /* assign memory for histogram */
-				   if ( modelHist == NULL ) {
-					   return -1;
-				   }
-				   /* Calculation of model target histogram */
-				   calColorHistogram( x0, y0, Wx, Hy, img, W, H, modelHist, nbin );
-				   /* Initialize particle state with x0, y0, 1, 1, Wx, Hy, 0.1
-				   taking center of Normal Distribution to be N(0, 0.4) */
-				   states[0].xCoor = x0;
-				   states[0].yCoor = y0;
-				   states[0].v_xt = (float) 0.0; 
-				   states[0].v_yt = (float) 0.0; 
-				   states[0].Hxt = Wx;
-				   states[0].Hyt = Hy;
-				   states[0].at_dot = (float) 0.0; 
-				   weights[0] = (float)(1.0/ NUM_PARTICLE); 
-				   for ( int i = 1; i < NUM_PARTICLE; i++ ) {
-					   for ( int j = 0; j < 7; j++ ) {
-						   random[j] = randGaussian( 0, (float)0.6 ); /* Produce seven random Gaussian numbers */
-					   }
-					   states[i].xCoor = (int)( states[0].xCoor + random[0] * Wx );
-					   states[i].yCoor = (int)( states[0].yCoor + random[1] * Hy );
-					   states[i].v_xt = (float)( states[0].v_xt + random[2] * VELOCITY_DISTURB );
-					   states[i].v_yt = (float)( states[0].v_yt + random[3] * VELOCITY_DISTURB );
-					   states[i].Hxt = (int)( states[0].Hxt + random[4] * SCALE_DISTURB );
-					   states[i].Hyt = (int)( states[0].Hyt + random[5] * SCALE_DISTURB );
-					   states[i].at_dot = (float)( states[0].at_dot + random[6] * SCALE_CHANGE_D );
-					   /* average weight is 1/N, because all particles  have equal probability*/
-					   weights[i] = (float)(1.0 / NUM_PARTICLE);
-				   }
-				   return 1;
+int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H ){
+	float random[7];
+	setSeed(0); /* for random */
+	states = new SPACESTATE [NUM_PARTICLE]; // assign memory for statespace array 
+	if ( states == NULL ) {
+		return -2;
+	}
+	weights = new float [NUM_PARTICLE];     // assign memory for weight array
+	if ( weights == NULL ) {
+		return -3;	
+	}
+	nbin = R_BIN * G_BIN * B_BIN; /* Determine the values of histogram */
+	modelHist = new float [nbin]; /* assign memory for histogram */
+	if ( modelHist == NULL ) {
+		return -1;
+	}
+	//Calculation of model target histogram
+	calColorHistogram( x0, y0, Wx, Hy, img, W, H, modelHist, nbin );
+	/* Initialize particle state with x0, y0, 1, 1, Wx, Hy, 0.1
+	taking center of Normal Distribution to be N(0, 0.4) */
+	states[0].xCoor = x0;
+	states[0].yCoor = y0;
+	states[0].v_xt = (float) 0.0; 
+	states[0].v_yt = (float) 0.0; 
+	states[0].Hxt = Wx;
+	states[0].Hyt = Hy;
+	states[0].at_dot = (float) 0.0; 
+	weights[0] = (float)(1.0/ NUM_PARTICLE); 
+	for ( int i = 1; i < NUM_PARTICLE; i++ ) {
+		for ( int j = 0; j < 7; j++ ) {
+			random[j] = randGaussian( 0, (float)0.6 ); /* Produce seven random Gaussian numbers */
+		}
+		states[i].xCoor = (int)( states[0].xCoor + random[0] * Wx );
+		states[i].yCoor = (int)( states[0].yCoor + random[1] * Hy );
+		states[i].v_xt = (float)( states[0].v_xt + random[2] * VELOCITY_DISTURB );
+		states[i].v_yt = (float)( states[0].v_yt + random[3] * VELOCITY_DISTURB );
+		states[i].Hxt = (int)( states[0].Hxt + random[4] * SCALE_DISTURB );
+		states[i].Hyt = (int)( states[0].Hyt + random[5] * SCALE_DISTURB );
+		states[i].at_dot = (float)( states[0].at_dot + random[6] * SCALE_CHANGE_D );
+		/* average weight is 1/N, because all particles  have equal probability*/
+		weights[i] = (float)(1.0 / NUM_PARTICLE);
+	}
+	return 1;
 }
 
 /*
@@ -594,37 +583,37 @@ void mouseHandler( int event , int x, int y, int flags, void* param){
 
 //use some of the openCV drawing functions to draw crosshairs on our tracked image
 void drawObject(int x, int y , int z){
-		int radius = 3;
-		Scalar colorText = Scalar(0, 255, 0);
-		cvCircle(imgTrack, Point(x, y), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
+	int radius = 3;
+	Scalar colorText = Scalar(0, 255, 0);
+	cvCircle(imgTrack, Point(x, y), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
 
-		//cvCircle(imgTrack, Point(x, y), 3 , CV_RGB(255, 255, 0), 1, 4, 3 );
+	//cvCircle(imgTrack, Point(x, y), 3 , CV_RGB(255, 255, 0), 1, 4, 3 );
 
-		//circle(frame, Point(x, y), radius, colorText, 2);
-		int lengthOfStraightLines = 3 + 5;
-		/*if (y - lengthOfStraightLines > 0){
-			cvLine(imgTrack, Point(x, y), Point(x, y - lengthOfStraightLines), colorText, 2);
-		} else {
-			cvLine(imgTrack, Point(x, y), Point(x, 0), colorText, 2);
-		}
-		if (y + lengthOfStraightLines < FRAME_HEIGHT) {
-			cvLine(imgTrack, Point(x, y), Point(x, y + lengthOfStraightLines), colorText, 2);
-		} else {
-			cvLine(imgTrack, Point(x, y), Point(x, FRAME_HEIGHT), colorText, 2);
-		}
-		if(x - lengthOfStraightLines > 0) {
-			cvLine(imgTrack, Point(x, y), Point(x - lengthOfStraightLines, y), colorText, 2);
-		} else {
-			cvLine(imgTrack, Point(x, y), Point(0, y), colorText, 2);
-		}
-		if (x + lengthOfStraightLines < FRAME_WIDTH){
-			cvLine(imgTrack, Point(x, y), Point(x + lengthOfStraightLines, y), colorText, 2);
-		} else {
-			cvLine(imgTrack, Point(x, y), Point(FRAME_WIDTH, y), colorText, 2);
-		}*/
-		/*putText(frame, intToString(x) + "," + intToString(y) + "," + std::to_string(z), Point(x + 30, y + 30), 1, 1 , colorText, 2);
-		putText(frame, "radius is " + intToString(radius), Point(x + 60, y + 60), 1, 1 , colorText, 2);*/
-	
+	//circle(frame, Point(x, y), radius, colorText, 2);
+	int lengthOfStraightLines = 3 + 5;
+	/*if (y - lengthOfStraightLines > 0){
+	cvLine(imgTrack, Point(x, y), Point(x, y - lengthOfStraightLines), colorText, 2);
+	} else {
+	cvLine(imgTrack, Point(x, y), Point(x, 0), colorText, 2);
+	}
+	if (y + lengthOfStraightLines < FRAME_HEIGHT) {
+	cvLine(imgTrack, Point(x, y), Point(x, y + lengthOfStraightLines), colorText, 2);
+	} else {
+	cvLine(imgTrack, Point(x, y), Point(x, FRAME_HEIGHT), colorText, 2);
+	}
+	if(x - lengthOfStraightLines > 0) {
+	cvLine(imgTrack, Point(x, y), Point(x - lengthOfStraightLines, y), colorText, 2);
+	} else {
+	cvLine(imgTrack, Point(x, y), Point(0, y), colorText, 2);
+	}
+	if (x + lengthOfStraightLines < FRAME_WIDTH){
+	cvLine(imgTrack, Point(x, y), Point(x + lengthOfStraightLines, y), colorText, 2);
+	} else {
+	cvLine(imgTrack, Point(x, y), Point(FRAME_WIDTH, y), colorText, 2);
+	}*/
+	/*putText(frame, intToString(x) + "," + intToString(y) + "," + std::to_string(z), Point(x + 30, y + 30), 1, 1 , colorText, 2);
+	putText(frame, "radius is " + intToString(radius), Point(x + 60, y + 60), 1, 1 , colorText, 2);*/
+
 }
 
 int main(int argc, char *argv[]){
@@ -639,7 +628,6 @@ int main(int argc, char *argv[]){
 	IplImage* frame[FRAME_INTERVAL]; //to store frames
 	float rho_v;//represents similarity level
 	float max_weight;
-
 	int sum = 0;    //value of two frames after comparison
 	for (int i = 0; i < FRAME_INTERVAL; i++){
 		frame[i] = NULL;
@@ -662,8 +650,7 @@ int main(int argc, char *argv[]){
 	Mat empty, newCameraMatrix, map1, map2, undistorted;
 	capture.read(cameraFeed);
 	Size imageSize = cameraFeed.size();
-	initUndistortRectifyMap(camera_matrix, distortion_coeff, empty, newCameraMatrix, imageSize,
-		CV_32FC1, map1, map2);
+	initUndistortRectifyMap(camera_matrix, distortion_coeff, empty, newCameraMatrix, imageSize, CV_32FC1, map1, map2);
 
 	while (1){
 		Mat image(Size(FRAME_WIDTH, FRAME_HEIGHT), CV_8UC3);
@@ -750,19 +737,19 @@ int main(int argc, char *argv[]){
 		cvSetMouseCallback("Original Video", mouseHandler, 0);
 		char c = cvWaitKey(10);
 		switch (c) {
-		//Press ESC to exit program
+			//Press ESC to exit program
 		case 27:
 			return 0;
-		//case 'm':
-		//case 'M':
-		//	shouldUseMorphOps = !shouldUseMorphOps;
-		//	if (shouldUseMorphOps) {
-		//		std::cout << MSG_MORPHING_ENABLED << std::endl;
-		//	} else {
-		//		std::cout << MSG_MORPHING_DISABLED << std::endl;
-		//	}
-		//	break;
-		//Press P to pause or resume the code
+			//case 'm':
+			//case 'M':
+			//	shouldUseMorphOps = !shouldUseMorphOps;
+			//	if (shouldUseMorphOps) {
+			//		std::cout << MSG_MORPHING_ENABLED << std::endl;
+			//	} else {
+			//		std::cout << MSG_MORPHING_DISABLED << std::endl;
+			//	}
+			//	break;
+			//Press P to pause or resume the code
 		case 'p': 
 		case 'P':
 			isProgramPaused = !isProgramPaused;
@@ -793,7 +780,7 @@ int main(int argc, char *argv[]){
 		default:
 			continue;
 		}
-		
+
 	}
 	cvReleaseImage(&curFrameGray);
 	cvReleaseImage(&frameGray);
