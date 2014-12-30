@@ -50,7 +50,9 @@ const string WINDOW_NAME_TRACKBAR = "Trackbars";
 
 //constants for calculating Z
 const float ACTUAL_HEIGHT_IN_CM = 30;
-const float STICKER_WIDTH_IN_CM = 7.5; //added 0.3cm to actual size because using dilate
+const float STICKER_LENGTH_IN_CM = 7.2; 
+const float STICKER_BREADTH_IN_CM = 4.0; 
+
 const float STICKER_AREA_IN_CM2 = 28.8; 
 
 typedef struct __SpaceState {  
@@ -96,13 +98,6 @@ Point origin;
 Rect selection;
 
 # define SIGMA2       0.02           /* 2*sigma^2, here sigma = 0.1 */
-
-//This function gets called whenever a trackbar position is changed
-void on_trackbar( int, void* )
-{
-}
-
-
 
 /*
 set random seed with the parameter specified or the system time.
@@ -545,11 +540,12 @@ string intToString(int number){
 
 //Method to find the Z coordinates.
 float findZCoor(float areaOfImageInPx){
-	float focalLength = sqrt (1196 / 1.8) / STICKER_WIDTH_IN_CM * ACTUAL_HEIGHT_IN_CM;
+	float scale = STICKER_LENGTH_IN_CM/ STICKER_BREADTH_IN_CM;
+	float focalLength = sqrt (1196 / scale) / STICKER_LENGTH_IN_CM * ACTUAL_HEIGHT_IN_CM;
 	if (areaOfImageInPx == 0){
 		return 0;
 	}
-	float zCoor = focalLength / sqrt(areaOfImageInPx/1.8) * STICKER_WIDTH_IN_CM;
+	float zCoor = focalLength / sqrt(areaOfImageInPx/scale) * STICKER_LENGTH_IN_CM;
 	return zCoor;
 }
 
@@ -601,8 +597,8 @@ void drawObject(int x, int y , int z){
 int main(int argc, char *argv[]){
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
-		capture.open(ID_CAM_GO_PRO);
-		//capture.open(0);
+		//capture.open(ID_CAM_GO_PRO);
+		capture.open(0);
 	} else if( argc == 2 ){
 		//capture = cvCaptureFromAVI( /*argv[1]*/"../13.avi");
 		capture.open(0);
@@ -670,8 +666,7 @@ int main(int argc, char *argv[]){
 				Scalar newVal = isColor ? Scalar(b, g, r) : Scalar(r*0.299 + g*0.587 + b*0.114);
 				Mat dst = imgTrack;
 				int area = floodFill(dst, seed, newVal, &ccomp, Scalar(lo, lo, lo), Scalar(up, up, up), flags);
-				//rectangle(dst, ccomp, Scalar(b,g,r), 1, 8, 0 );
-				//imshow("image", dst);
+				
 				int zout = findZCoor(area);
 
 				//Drawing rectangle based on stored xout and yout values.
@@ -682,22 +677,9 @@ int main(int argc, char *argv[]){
 				int yTopRight = yout + heightOutput;
 				cvRectangle(imgTrack, cvPoint(xTopLeft, yTopLeft), cvPoint(xTopRight, yTopRight), cvScalar(255,0,0), 2, 8, 0);
 				cv::Rect const mask(xTopLeft, yTopLeft, 2 * widthOutput, 2 * heightOutput);
-				//cMat roi(imgTrack, mask);
-				//cvtColor(roi, image, COLOR_BGR2HSV);
-				//filter HSV image between values and store filtered image to threshold matrix
-				//inRange(image, Scalar(H_MIN,S_MIN,V_MIN), Scalar(H_MAX,S_MAX,V_MAX), image);
-				//inRange(image, Scalar(170, 150, 150), Scalar(256, 256 ,256), image);
 				
-				cout << area << " pixels were repainted\n";
-				vector<vector<Point>> contours;
-				vector<Vec4i> hierarchy;
-				//findContours(roi, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
-				//vector<RotatedRect> minRect( contours.size() ); //used to find bounding rectangle of sticker
+				//cout << area << " pixels were repainted\n";
 
-				/*for(int i = 0; i < roi.size(); ++i) {
-				drawContours(mat, candidates, i, Scalar(0,0,255), 1, CV_AA, hierarchy, 1, inflated_rect.tl());
-				}*/
-				//cvCircle(imgTrack, Point(xout, yout), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
 				drawObject(xout, yout, 0);
 				CvFont font;
 				double hScale=1.0, vScale=1.0;
@@ -720,8 +702,6 @@ int main(int argc, char *argv[]){
 		}
 		cvNamedWindow("Original Video", 1);
 		cvNamedWindow("Tracking", 1);
-		//cvNamedWindow("ROI", 1);
-		//imshow("ROI", image);
 		cvShowImage("Original Video",curframe);
 		cvShowImage("Tracking", imgTrack);
 		cvSetMouseCallback("Original Video", mouseHandler, 0);
