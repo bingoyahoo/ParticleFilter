@@ -615,8 +615,8 @@ int main(int argc, char *argv[]){
 	//createTrackbars();
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
-		//capture.open(ID_CAM_GO_PRO);
-		capture.open(0);
+		capture.open(ID_CAM_GO_PRO);
+		//capture.open(0);
 	} else if( argc == 2 ){
 		//capture = cvCaptureFromAVI( /*argv[1]*/"../13.avi");
 		capture.open(0);
@@ -668,7 +668,7 @@ int main(int argc, char *argv[]){
 			//if ( rho_v > 0 && max_weight > 0.0001 ) { /* determines if target is lost */
 			if (rho_v > 0 ){
 				Point seed = Point(xout, yout);
-				int loDiff = 83, upDiff = 83; //by trial and error
+				int loDiff = 30, upDiff = 35; //by trial and error
 				int connectivity = 4;
 				int isColor = true;
 				bool useMask = false;
@@ -685,7 +685,7 @@ int main(int argc, char *argv[]){
 				Mat dst = imgTrack;
 				int area = floodFill(dst, seed, newVal, &ccomp, Scalar(lo, lo, lo), Scalar(up, up, up), flags);
 				//rectangle(dst, ccomp, Scalar(b,g,r), 1, 8, 0 );
-				imshow("image", dst);
+				//imshow("image", dst);
 
 				//Drawing rectangle based on stored xout and yout values.
 				//We make the bounding rectangle bigger than actual size to do processing on it.
