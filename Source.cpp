@@ -9,7 +9,8 @@
 using namespace std;
 using namespace cv;
 
-#define _CRT_SECURE_NO_WARNINGS 
+#define _CRT_SECURE_NO_DEPRECATE
+
 #define B(image,x,y) ((uchar*)(image->imageData + image->widthStep*(y)))[(x)*3]		//B
 #define G(image,x,y) ((uchar*)(image->imageData + image->widthStep*(y)))[(x)*3+1]	//G
 #define R(image,x,y) ((uchar*)(image->imageData + image->widthStep*(y)))[(x)*3+2]	//R
@@ -36,6 +37,18 @@ const string ID_CAM_GO_PRO = "http://10.5.5.9:8080/live/amba.m3u8";
 const int FRAME_WIDTH = 640;
 const int FRAME_HEIGHT = 480;
 # define ALPHA_COEFFICIENT      0.3     // refresh rate of target model bw 0.1  - 0.3 
+
+//initial min and max HSV filter values. These will be changed using trackbars.
+int H_MIN = 0;
+int H_MAX = 256;
+int S_MIN = 0;
+int S_MAX = 256;
+int V_MIN = 0;
+int V_MAX = 256;
+
+const string WINDOW_NAME_TRACKBAR = "Trackbars";
+
+
 
 typedef struct __SpaceState {  
 	int xCoor;              
@@ -80,6 +93,13 @@ Point origin;
 Rect selection;
 
 # define SIGMA2       0.02           /* 2*sigma^2, here sigma = 0.1 */
+
+//This function gets called whenever a trackbar position is changed
+void on_trackbar( int, void* )
+{
+}
+
+
 
 /*
 set random seed with the parameter specified or the system time.
@@ -559,6 +579,32 @@ void mouseHandler( int event, int x, int y, int flags, void* param){
 	}
 }
 
+
+void createTrackbars(){
+	//create window for trackbars
+	namedWindow(WINDOW_NAME_TRACKBAR,0);
+	//create memory to store trackbar name on window
+	char TrackbarName[50];
+	sprintf( TrackbarName, "H_MIN", H_MIN);
+	sprintf( TrackbarName, "H_MAX", H_MAX);
+	sprintf( TrackbarName, "S_MIN", S_MIN);
+	sprintf( TrackbarName, "S_MAX", S_MAX);
+	sprintf( TrackbarName, "V_MIN", V_MIN);
+	sprintf( TrackbarName, "V_MAX", V_MAX);
+	//create trackbars and insert them into window
+	//3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
+	//the max value the trackbar can move (eg. H_HIGH), 
+	//and the function that is called whenever the trackbar is moved(eg. on_trackbar)
+	//                                  ---->    ---->     ---->      
+	createTrackbar( "H_MIN", WINDOW_NAME_TRACKBAR, &H_MIN, H_MAX, on_trackbar );
+	createTrackbar( "H_MAX", WINDOW_NAME_TRACKBAR, &H_MAX, H_MAX, on_trackbar );
+	createTrackbar( "S_MIN", WINDOW_NAME_TRACKBAR, &S_MIN, S_MAX, on_trackbar );
+	createTrackbar( "S_MAX", WINDOW_NAME_TRACKBAR, &S_MAX, S_MAX, on_trackbar );
+	createTrackbar( "V_MIN", WINDOW_NAME_TRACKBAR, &V_MIN, V_MAX, on_trackbar );
+	createTrackbar( "V_MAX", WINDOW_NAME_TRACKBAR, &V_MAX, V_MAX, on_trackbar );
+
+}
+
 //use some of the openCV drawing functions to draw crosshairs on our tracked image
 void drawObject(int x, int y , int z){
 	Scalar colorText = Scalar(0, 255, 0);
@@ -566,6 +612,7 @@ void drawObject(int x, int y , int z){
 }
 
 int main(int argc, char *argv[]){
+	//createTrackbars();
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
 		//capture.open(ID_CAM_GO_PRO);
@@ -620,6 +667,26 @@ int main(int argc, char *argv[]){
 			/* Draw a blue box around the new position */
 			//if ( rho_v > 0 && max_weight > 0.0001 ) { /* determines if target is lost */
 			if (rho_v > 0 ){
+				Point seed = Point(xout, yout);
+				int loDiff = 83, upDiff = 83; //by trial and error
+				int connectivity = 4;
+				int isColor = true;
+				bool useMask = false;
+				int newMaskVal = 255;
+				int ffillMode = 1;
+				int lo = ffillMode == 0 ? 0 : loDiff;
+				int up = ffillMode == 0 ? 0 : upDiff;
+				int flags = connectivity + (newMaskVal << 8) + (ffillMode == 1 ? CV_FLOODFILL_FIXED_RANGE : 0);
+				int b = (unsigned)theRNG() & 255;
+				int g = (unsigned)theRNG() & 255;
+				int r = (unsigned)theRNG() & 255;
+				Rect ccomp;
+				Scalar newVal = isColor ? Scalar(b, g, r) : Scalar(r*0.299 + g*0.587 + b*0.114);
+				Mat dst = imgTrack;
+				int area = floodFill(dst, seed, newVal, &ccomp, Scalar(lo, lo, lo), Scalar(up, up, up), flags);
+				//rectangle(dst, ccomp, Scalar(b,g,r), 1, 8, 0 );
+				imshow("image", dst);
+
 				//Drawing rectangle based on stored xout and yout values.
 				//We make the bounding rectangle bigger than actual size to do processing on it.
 				int xTopLeft = xout - widthOutput;
@@ -628,12 +695,13 @@ int main(int argc, char *argv[]){
 				int yTopRight = yout + heightOutput;
 				cvRectangle(imgTrack, cvPoint(xTopLeft, yTopLeft), cvPoint(xTopRight, yTopRight), cvScalar(255,0,0), 2, 8, 0);
 				cv::Rect const mask(xTopLeft, yTopLeft, 2 * widthOutput, 2 * heightOutput);
-				Mat roi(imgTrack, mask);
-				cvtColor(roi, image, COLOR_BGR2HSV);
+				//cMat roi(imgTrack, mask);
+				//cvtColor(roi, image, COLOR_BGR2HSV);
 				//filter HSV image between values and store filtered image to threshold matrix
-				inRange(roi, Scalar(256, 256, 256), Scalar(256, 256, 256), roi);
-				//inRange(HSV, Scalar(H_MIN,S_MIN,V_MIN), Scalar(H_MAX,S_MAX,V_MAX), threshold);
-				//roi = Scalar(0, 255, 255);
+				//inRange(image, Scalar(H_MIN,S_MIN,V_MIN), Scalar(H_MAX,S_MAX,V_MAX), image);
+				//inRange(image, Scalar(170, 150, 150), Scalar(256, 256 ,256), image);
+				
+				//cout << area << " pixels were repainted\n";
 				vector<vector<Point>> contours;
 				vector<Vec4i> hierarchy;
 				//findContours(roi, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
@@ -665,14 +733,14 @@ int main(int argc, char *argv[]){
 		}
 		cvNamedWindow("Original Video", 1);
 		cvNamedWindow("Tracking", 1);
-		cvNamedWindow("ROI", 1);
-		imshow("ROI", image);
+		//cvNamedWindow("ROI", 1);
+		//imshow("ROI", image);
 		cvShowImage("Original Video",curframe);
 		cvShowImage("Tracking", imgTrack);
 		cvSetMouseCallback("Original Video", mouseHandler, 0);
 		char c = cvWaitKey(10);
 		switch (c) {
-		//Press ESC to exit program
+			//Press ESC to exit program
 		case 27:
 			return 0;
 			//case 'm':
