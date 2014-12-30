@@ -38,21 +38,10 @@ const int FRAME_WIDTH = 640;
 const int FRAME_HEIGHT = 480;
 # define ALPHA_COEFFICIENT      0.3     // refresh rate of target model bw 0.1  - 0.3 
 
-//initial min and max HSV filter values. These will be changed using trackbars.
-int H_MIN = 0;
-int H_MAX = 256;
-int S_MIN = 0;
-int S_MAX = 256;
-int V_MIN = 0;
-int V_MAX = 256;
-
-const string WINDOW_NAME_TRACKBAR = "Trackbars";
-
 //constants for calculating Z
 const float ACTUAL_HEIGHT_IN_CM = 30;
 const float STICKER_LENGTH_IN_CM = 7.2; 
 const float STICKER_BREADTH_IN_CM = 4.0; 
-
 const float STICKER_AREA_IN_CM2 = 28.8; 
 
 typedef struct __SpaceState {  
@@ -597,8 +586,8 @@ void drawObject(int x, int y , int z){
 int main(int argc, char *argv[]){
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
-		//capture.open(ID_CAM_GO_PRO);
-		capture.open(0);
+		capture.open(ID_CAM_GO_PRO);
+		//capture.open(0);
 	} else if( argc == 2 ){
 		//capture = cvCaptureFromAVI( /*argv[1]*/"../13.avi");
 		capture.open(0);
