@@ -48,7 +48,10 @@ int V_MAX = 256;
 
 const string WINDOW_NAME_TRACKBAR = "Trackbars";
 
-
+//constants for calculating Z
+const float ACTUAL_HEIGHT_IN_CM = 30;
+const float STICKER_WIDTH_IN_CM = 7.5; //added 0.3cm to actual size because using dilate
+const float STICKER_AREA_IN_CM2 = 28.8; 
 
 typedef struct __SpaceState {  
 	int xCoor;              
@@ -80,7 +83,7 @@ float VELOCITY_DISTURB = 40.0;  /* disturbance of velocity */
 float SCALE_DISTURB = 0.0;      /* disturbance of windows width and height */
 float SCALE_CHANGE_D = (float)0.001;   /* disturbance of scaling speed changes */
 
-int NUM_PARTICLE = 1000;       // For particle filter   
+int NUM_PARTICLE = 2000;       // For particle filter   
 float * modelHist = NULL; // Model of historgram 
 SPACESTATE * states = NULL;  // array for states 
 float * weights = NULL;   // weights of particles 
@@ -540,6 +543,16 @@ string intToString(int number){
 	return ss.str();
 }
 
+//Method to find the Z coordinates.
+float findZCoor(float areaOfImageInPx){
+	float focalLength = sqrt (1196 / 1.8) / STICKER_WIDTH_IN_CM * ACTUAL_HEIGHT_IN_CM;
+	if (areaOfImageInPx == 0){
+		return 0;
+	}
+	float zCoor = focalLength / sqrt(areaOfImageInPx/1.8) * STICKER_WIDTH_IN_CM;
+	return zCoor;
+}
+
 //Converts an IplImage to img
 void iplToImge(IplImage* src, int w,int h){
 	for ( int j = 0; j < h; j++ ) { // Turn into a positive image
@@ -579,32 +592,6 @@ void mouseHandler( int event, int x, int y, int flags, void* param){
 	}
 }
 
-
-void createTrackbars(){
-	//create window for trackbars
-	namedWindow(WINDOW_NAME_TRACKBAR,0);
-	//create memory to store trackbar name on window
-	char TrackbarName[50];
-	sprintf( TrackbarName, "H_MIN", H_MIN);
-	sprintf( TrackbarName, "H_MAX", H_MAX);
-	sprintf( TrackbarName, "S_MIN", S_MIN);
-	sprintf( TrackbarName, "S_MAX", S_MAX);
-	sprintf( TrackbarName, "V_MIN", V_MIN);
-	sprintf( TrackbarName, "V_MAX", V_MAX);
-	//create trackbars and insert them into window
-	//3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
-	//the max value the trackbar can move (eg. H_HIGH), 
-	//and the function that is called whenever the trackbar is moved(eg. on_trackbar)
-	//                                  ---->    ---->     ---->      
-	createTrackbar( "H_MIN", WINDOW_NAME_TRACKBAR, &H_MIN, H_MAX, on_trackbar );
-	createTrackbar( "H_MAX", WINDOW_NAME_TRACKBAR, &H_MAX, H_MAX, on_trackbar );
-	createTrackbar( "S_MIN", WINDOW_NAME_TRACKBAR, &S_MIN, S_MAX, on_trackbar );
-	createTrackbar( "S_MAX", WINDOW_NAME_TRACKBAR, &S_MAX, S_MAX, on_trackbar );
-	createTrackbar( "V_MIN", WINDOW_NAME_TRACKBAR, &V_MIN, V_MAX, on_trackbar );
-	createTrackbar( "V_MAX", WINDOW_NAME_TRACKBAR, &V_MAX, V_MAX, on_trackbar );
-
-}
-
 //use some of the openCV drawing functions to draw crosshairs on our tracked image
 void drawObject(int x, int y , int z){
 	Scalar colorText = Scalar(0, 255, 0);
@@ -612,7 +599,6 @@ void drawObject(int x, int y , int z){
 }
 
 int main(int argc, char *argv[]){
-	//createTrackbars();
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
 		capture.open(ID_CAM_GO_PRO);
@@ -668,7 +654,7 @@ int main(int argc, char *argv[]){
 			//if ( rho_v > 0 && max_weight > 0.0001 ) { /* determines if target is lost */
 			if (rho_v > 0 ){
 				Point seed = Point(xout, yout);
-				int loDiff = 30, upDiff = 35; //by trial and error
+				int loDiff = 50, upDiff = 55; //by trial and error
 				int connectivity = 4;
 				int isColor = true;
 				bool useMask = false;
@@ -686,6 +672,7 @@ int main(int argc, char *argv[]){
 				int area = floodFill(dst, seed, newVal, &ccomp, Scalar(lo, lo, lo), Scalar(up, up, up), flags);
 				//rectangle(dst, ccomp, Scalar(b,g,r), 1, 8, 0 );
 				//imshow("image", dst);
+				int zout = findZCoor(area);
 
 				//Drawing rectangle based on stored xout and yout values.
 				//We make the bounding rectangle bigger than actual size to do processing on it.
@@ -701,7 +688,7 @@ int main(int argc, char *argv[]){
 				//inRange(image, Scalar(H_MIN,S_MIN,V_MIN), Scalar(H_MAX,S_MAX,V_MAX), image);
 				//inRange(image, Scalar(170, 150, 150), Scalar(256, 256 ,256), image);
 				
-				//cout << area << " pixels were repainted\n";
+				cout << area << " pixels were repainted\n";
 				vector<vector<Point>> contours;
 				vector<Vec4i> hierarchy;
 				//findContours(roi, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
@@ -716,9 +703,9 @@ int main(int argc, char *argv[]){
 				double hScale=1.0, vScale=1.0;
 				int    lineWidth=2;
 				cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale, vScale, 0, lineWidth);
-				std::string s =  std::to_string(xout) + ", " + std::to_string(yout);
+				std::string s =  std::to_string(xout) + "," + std::to_string(yout) + "," + std::to_string(zout);
 				char* c = new char[s.length() + 1];
-				strcpy_s(c, 10, s.c_str());
+				strcpy_s(c, 11, s.c_str());
 				cvPutText (imgTrack, c , cvPoint(30, 30), &font, cvScalar(255,255,0));
 				xin = xout; //for next frame
 				yin = yout;
