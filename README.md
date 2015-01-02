@@ -52,3 +52,12 @@ It looks something like this.
 
 ![alt tag](images/fisheye-removal.png)
 
+Results
+--------
+The following screenshot shows the current results of the program used to track the red sticker. Note that there are in fact a lot of particles bombarding every frame, but I commented out the line that is drawing the particles to save on processing power. 
+
+![alt tag](images/tracking.png)
+
+I have tested the program at short distances (0~2m) away from the camera. As of now, the coordinates returned are still relatively accurate. However, the algorithm is not reliable enough when the sticker gets too far. This is probably because the colour segmentation is not clear when the sticker becomes too small in the image.
+
+Futhermore, z depends on x and y as of now. Z is only accurate iff x and y are accurate because of the floodfill algorithm.
