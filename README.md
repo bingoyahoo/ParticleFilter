@@ -45,7 +45,7 @@ Distortion
 ------
 There are two main types of distortion resulting from any camera lens. The first type is called the radial distortion which is also known as the fish eye effect. Basically, this is caused by light bending more away from the lens. The second type is called tangential distortion which is caused by the mis-alignment of the lens and the imager wihin the camera.
 
-In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. I removed the distortion through capturing a chessboard image. If you are working with a simple webcam, try removing the calls to initUndistortRectifyMap and remap.
+In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. I removed the distortion by capturing many images of a chessboard with the GoPro. I then use OpenCV to process them and store the calibration results in the xml file. If you are working with a simple webcam, try removing the calls to initUndistortRectifyMap and remap.
 
 ![alt tag](http://dasl.mem.drexel.edu/~noahKuntz/opencvtut10-1.png) 
 It looks something like this.
