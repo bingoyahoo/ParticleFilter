@@ -4,7 +4,7 @@ This is an example of a Particle Filter using colour segmentation and OpenCV tha
 
 Idea behind Particle Filter
 ---------
-This is a pretty good analogy to understand Particle Filter from the Udacity forums.
+This is a pretty good analogy to understand Particle Filter from Udacity.
 
 1. Think of a big field where there is a bucket of sugar (robot) somewhere.
 2. You release a lot of bees (particles) and they initially spread over the entire field.
@@ -13,12 +13,40 @@ This is a pretty good analogy to understand Particle Filter from the Udacity for
 5. While you cannot know where the bucket is, you can see where the bees are, and when they all concentrate in one big lump, you can be pretty certain that the bucket is there.
 6. Otherwise, there are some really confused bees that have lost their bearings and confused the rest of the swarm.
 
-In reality
+In reality (To find x and y)
 -----
-Particle filters make use of a lot of probability. We make measurements and assign a higher weight to the more probable particles. We then resample the particle based on their weighted probabilities. Over time, the most consistent particles will survive and we will have successfully localized our robot.
+Particle filters make use of a lot of probability. We make measurements and assign a higher weight to the more probable particles. We then resample the particle based on their weighted probabilities. Over time, the most consistent particles will survive and we will have successfully localized the robot.
 
 Based on my experience, particle filters seem more robust than simple colour segmentation/blob detection when used to track robots in different lighting conditions.
 
-Note
+How to find z coordinates with one camera?
+-------
+Finding z is easier with two cameras aka stereo vision. It is how humans perceive 3D objects in real life. However, if we only have one camera, we can still get a fairly good estimate of z using the following idea:
+
+![alt tag](http://cdn-7.nikon-cdn.com/en_INC/IMG/Images/Learn-Explore/Photography-Techniques/2009/Focal-Length/Media/focal-length-graphic.jpg)
+
+Notice that there are two similar triangles (in yellow) formed by the actual object, lens of the camera, and the image. By proportionality of similar triangles, 
+
+`object distance/image distance = object height/image height`
+
+When we are trying to get z, we are actually looking for the object distance from the camera. The image distance is usually known as the focal length. It is a measure of how strongly the lens converges or diverges light and remains fixed. 
+
+What we can do to get z is to use the camera to get the image distance aka focal length first:
+
+1. Place an object of known height at a known distance (say 30cm) away from the camera. You will get the object distance and object height in cm or m. In my case, I used a red sticker of 7.2 by 4cm.
+2. Use the camera to capture the object.
+3. Find out the height of the object in the image(using OpenCV). This will be in pixels.
+4. Use the formula to get the image distance aka focal length of the camera lens.
+5. From now on, you can use the focal length and the formula to estimate the distance that this object is away from the camera i.e the z coordinates.
+
+Note: Every time you change the resolution of the camera or use another camera, you have to redo this process as different cameras have different focal lengths.
+
+Distortion
 ------
-In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. If you are working with a webcam, try removing the calls to initUndistortRectifyMap and remap.
+There are two main types of distortion resulting from any camera lens. The first type is called the radial distortion which is also known as the fish eye effect. Basically, this is caused by light bending more away from the lens. The second type is called tangential distortion which is caused by the mis-alignment of the lens and the imager wihin the camera.
+
+In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. I removed the distortion through capturing a chessboard image. If you are working with a simple webcam, try removing the calls to initUndistortRectifyMap and remap.
+
+![alt tag](http://dasl.mem.drexel.edu/~noahKuntz/opencvtut10-1.png) 
+It looks something like this.
+
