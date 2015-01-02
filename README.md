@@ -32,6 +32,7 @@ Notice that there are two similar triangles (in yellow) formed by the actual obj
 When we are trying to get z, we are actually looking for the object distance from the camera. The image distance is usually known as the focal length. It is a measure of how strongly the lens converges or diverges light and remains fixed. 
 
 What we can do to get z is to use the camera to get the image distance aka focal length first:
+
 1. Place an object of known height at a known distance (say 30cm) away from the camera. You will get the object distance and object height in cm or m.
 2. Use the camera to capture the object.
 3. Find out the height of the object in the image(using OpenCV). This will be in pixels.
