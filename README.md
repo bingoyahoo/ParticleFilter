@@ -33,7 +33,7 @@ When we are trying to get z, we are actually looking for the object distance fro
 
 What we can do to get z is to use the camera to get the image distance aka focal length first:
 
-1. Place an object of known height at a known distance (say 30cm) away from the camera. You will get the object distance and object height in cm or m.
+1. Place an object of known height at a known distance (say 30cm) away from the camera. You will get the object distance and object height in cm or m. In my case, I used a red sticker of 7.2 by 4cm.
 2. Use the camera to capture the object.
 3. Find out the height of the object in the image(using OpenCV). This will be in pixels.
 4. Use the formula to get the image distance aka focal length of the camera lens.
@@ -41,6 +41,12 @@ What we can do to get z is to use the camera to get the image distance aka focal
 
 Note: Every time you change the resolution of the camera or use another camera, you have to redo this process as different cameras have different focal lengths.
 
-Note
+Distortion
 ------
-In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. If you are working with a webcam, try removing the calls to initUndistortRectifyMap and remap.
+There are two main types of distortion resulting from any camera lens. The first type is called the radial distortion which is also known as the fish eye effect. Basically, this is caused by light bending more away from the lens. The second type is called tangential distortion which is caused by the mis-alignment of the lens and the imager wihin the camera.
+
+In my code, I calibrated the program to work with a GoPro camera with high fisheye distortion. I removed the distortion through capturing a chessboard image. If you are working with a simple webcam, try removing the calls to initUndistortRectifyMap and remap.
+
+![alt tag](http://dasl.mem.drexel.edu/~noahKuntz/opencvtut10-1.png) 
+It looks something like this.
+
