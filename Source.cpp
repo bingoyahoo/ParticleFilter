@@ -43,6 +43,7 @@ const float ACTUAL_HEIGHT_IN_CM = 30;
 const float STICKER_LENGTH_IN_CM = 7.2; 
 const float STICKER_BREADTH_IN_CM = 4.0; 
 const float STICKER_AREA_IN_CM2 = 28.8; 
+const int LINE_WIDTH = 2;
 
 typedef struct __SpaceState {  
 	int xCoor;              
@@ -586,14 +587,15 @@ void drawObject(int x, int y , int z){
 int main(int argc, char *argv[]){
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
-		capture.open(ID_CAM_GO_PRO);
-		//capture.open(0);
-	} else if( argc == 2 ){
-		//capture = cvCaptureFromAVI( /*argv[1]*/"../13.avi");
+		//capture.open(ID_CAM_GO_PRO);
 		capture.open(0);
+	} else if( argc == 2 ){
+		capture.open(argv[1]);
+	} else {
+		return -1;
 	}
 	IplImage* frame[FRAME_INTERVAL]; //to store frames
-	float rho_v;//represents similarity level
+	float rho_v; //represents similarity level
 	float max_weight;
 	for (int i = 0; i < FRAME_INTERVAL; i++){
 		frame[i] = NULL;
@@ -610,6 +612,8 @@ int main(int argc, char *argv[]){
 	fs["Distortion_Coefficients"] >> distortion_coeff;
 	fs["Camera_Matrix"] >> camera_matrix;
 	fs.release();
+
+	//For removing distortion
 	Mat empty, newCameraMatrix, map1, map2, undistorted;
 	capture.read(cameraFeed);
 	Size imageSize = cameraFeed.size();
@@ -652,32 +656,30 @@ int main(int argc, char *argv[]){
 				int g = (unsigned)theRNG() & 255;
 				int r = (unsigned)theRNG() & 255;
 				Rect ccomp;
-				Scalar newVal = isColor ? Scalar(b, g, r) : Scalar(r*0.299 + g*0.587 + b*0.114);
+				Scalar newVal = isColor ? Scalar(b, g, r) : Scalar(r * 0.299 + g * 0.587 + b * 0.114);
 				Mat dst = imgTrack;
 				int area = floodFill(dst, seed, newVal, &ccomp, Scalar(lo, lo, lo), Scalar(up, up, up), flags);
 				
 				int zout = findZCoor(area);
+				//cout << area << " pixels were repainted\n"; //Used for calibration
 
-				//Drawing rectangle based on stored xout and yout values.
+				//Drawing bounding rectangle based on stored xout and yout values.
 				//We make the bounding rectangle bigger than actual size to do processing on it.
 				int xTopLeft = xout - widthOutput;
 				int xTopRight = xout + widthOutput;
 				int yTopLeft =  yout - heightOutput;
 				int yTopRight = yout + heightOutput;
 				cvRectangle(imgTrack, cvPoint(xTopLeft, yTopLeft), cvPoint(xTopRight, yTopRight), cvScalar(255,0,0), 2, 8, 0);
-				cv::Rect const mask(xTopLeft, yTopLeft, 2 * widthOutput, 2 * heightOutput);
-				
-				//cout << area << " pixels were repainted\n";
+				cv::Rect const mask(xTopLeft, yTopLeft, 2 * widthOutput, 2 * heightOutput);		
 
 				drawObject(xout, yout, 0);
 				CvFont font;
 				double hScale=1.0, vScale=1.0;
-				int    lineWidth=2;
-				cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale, vScale, 0, lineWidth);
+				cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale, vScale, 0, LINE_WIDTH);
 				std::string s =  std::to_string(xout) + "," + std::to_string(yout) + "," + std::to_string(zout);
 				char* c = new char[s.length() + 1];
 				strcpy_s(c, 11, s.c_str());
-				cvPutText (imgTrack, c , cvPoint(30, 30), &font, cvScalar(255,255,0));
+				cvPutText (imgTrack, c , cvPoint(30, 30), &font, cvScalar(255, 255, 0));
 				xin = xout; //for next frame
 				yin = yout;
 				widthInput = widthOutput; 
@@ -696,19 +698,10 @@ int main(int argc, char *argv[]){
 		cvSetMouseCallback("Original Video", mouseHandler, 0);
 		char c = cvWaitKey(10);
 		switch (c) {
-			//Press ESC to exit program
+		//Press ESC to exit program
 		case 27:
 			return 0;
-			//case 'm':
-			//case 'M':
-			//	shouldUseMorphOps = !shouldUseMorphOps;
-			//	if (shouldUseMorphOps) {
-			//		std::cout << MSG_MORPHING_ENABLED << std::endl;
-			//	} else {
-			//		std::cout << MSG_MORPHING_DISABLED << std::endl;
-			//	}
-			//	break;
-			//Press P to pause or resume the code
+		//Press P to pause or resume the code
 		case 'p': 
 		case 'P':
 			isProgramPaused = !isProgramPaused;
