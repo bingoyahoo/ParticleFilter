@@ -66,10 +66,10 @@ Current algorithm
 
 Results
 --------
-The following screenshot shows the current results of the program used to track the red sticker. More screenshotos are shown in the images folder. Note that there are in fact a lot of particles bombarding every frame, but I commented out the line that is drawing the particles to save on processing power. 
+The following screenshot shows the current results of the program used to track the red sticker. Note that there are in fact a lot of particles bombarding every frame, but I commented out the line that is drawing the particles to save on processing power. 
 
 ![alt tag](images/tracking.png)
 
-I have tested the program at short distances (0~1.5m) away from the camera. As of now, the coordinates returned are still relatively accurate. However, the algorithm is not reliable enough when the sticker gets too far (like about 2m). This is probably because the colour segmentation is not clear when the sticker becomes too small in the image. A solution to increase the range could be to use a larger sticker or remap the image into a larger size.
+More screenshotos are shown in the images folder. I have tested the program at short distances (0~1.5m) away from the camera. As of now, the coordinates returned are still relatively accurate. However, the algorithm is not reliable enough when the sticker gets too far (like about 2m). This is probably because the colour segmentation is not clear when the sticker becomes too small in the image. A solution to increase the range could be to use a larger sticker or to remap the image into a larger size using OpenCV.
 
 Futhermore, z depends on x and y as of now. Z is only accurate iff x and y are accurate because of the floodfill algorithm.
