@@ -63,7 +63,8 @@ IplImage *imgForeground = NULL;
 IplImage *imgTrack = NULL;
 unsigned char *img;//convert iplimg to char* for easier calculation
 int xin, yin; //input coordinates centre of tracking
-int xout, yout; //output coordinates of centre of tracking
+int xout = 0 , yout = 0; //output coordinates of centre of tracking
+int zout = 0;
 int width, height; //of Windows
 int widthInput,heightInput; 
 int widthOutput,heightOutput; 
@@ -147,23 +148,23 @@ void calColorHistogram( int x0, int y0, int Wx, int Hy, unsigned char * image, i
 	for (int y = y_begin; y <= y_end; y++ ){
 		for (int x = x_begin; x <= x_end; x++ ){
 			int r = image[(y * W + x)* 3] >> R_SHIFT;   // Computing the histogram values 
-			int g = image[(y * W + x )* 3+1] >> G_SHIFT; // shift values are according to R G B values 
-			int b = image[(y * W + x ) * 3+2] >> B_SHIFT;
+			int g = image[(y * W + x )* 3 + 1] >> G_SHIFT; // shift values are according to R G B values 
+			int b = image[(y * W + x ) * 3 + 2] >> B_SHIFT;
 			int index = r * G_BIN * B_BIN + g * B_BIN + b;
-			float r2 = (float)(((y-y0) * (y-y0) + (x-x0) * (x-x0)) *1.0/ a2); // calculate radius squared r^2 
+			float r2 = (float)(((y - y0) * (y - y0) + (x - x0) * (x - x0)) * 1.0/ a2); // calculate radius squared r^2 
 			float k = 1 - r2;   // kernel value k(r) = 1-r^2, |r| < 1; other values k(r) = 0 
 			f = f + k;
 			colorHist[index] = colorHist[index] + k;  // Calculate the nuclear density weighted color histogram 
 		}
 	}
 	for ( int i = 0; i < bins; i++ ) {    // Normalize the Histogram 
-		colorHist[i] = colorHist[i]/f;
+		colorHist[i] = colorHist[i] / f;
 	}
 	return;
 }
 
 /*
-Returns Bhattacharyya coefficient -a measure of the amount of overlap between two statistical samples or populations
+Returns Bhattacharyya coefficient which is a measure of the amount of overlap between two statistical samples or populations
 Input parameters：
 float * p, * q：      two colour histogram density estimation
 int bins：            histogram values
@@ -206,12 +207,11 @@ float randGaussian( float u, float sigma){
 	float x1, x2, v1, v2, y;
 	float s = 100.0;
 	/*
-	Use the screening method (Box-Mulles method) to produce a random number from a 
-	normal distribution N~(0,1) 	
+	Use the screening method (Box-Mulles method) to produce a random number from a normal distribution N~(0,1) 	
 	1. Produce random variables X1, X2 between 0 and 1
 	2. Calculate 
-	V1= 2 * X1 - 1, 
-	V2= 2 * X2 - 1, 
+	V1 = 2 * X1 - 1, 
+	V2 = 2 * X2 - 1, 
 	s = V1^2 + V2^2
 	3. If s <= 1, go to step 4 , otherwise return to step 1
 	4. Calculate A = (-2ln(s)/s) ^ (1/2), y1 = V1 * A, y2 = V2 * A
@@ -234,20 +234,16 @@ float randGaussian( float u, float sigma){
 }
 
 /*
-Inialize the system
-int x0, y0：        initial coordinates
-int Wx, Hy：        target width and height
-unsigned char * img：	Image in RGB
-int W, H：          image width and height
+Initializes the system
 */
-int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H ){
+int initialize(int initialXCoor, int initialYCoor, int targetWidth, int targetHeight, unsigned char * imgRGB, int imgWidth, int imgHeight ){
 	float random[7];
 	setSeed(0); /* for random */
-	states = new SPACESTATE [NUM_PARTICLE]; // assign memory for statespace array 
+	states = new SPACESTATE [NUM_PARTICLE]; 
 	if (states == NULL) {
 		return -2;
 	}
-	weights = new float [NUM_PARTICLE];     // assign memory for weight array
+	weights = new float [NUM_PARTICLE]; 
 	if (weights == NULL) {
 		return -3;	
 	}
@@ -256,29 +252,29 @@ int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H
 	if ( modelHist == NULL ) {
 		return -1;
 	}
-	//Calculation of model target histogram
-	calColorHistogram(x0, y0, Wx, Hy, img, W, H, modelHist, nbin);
-	// Initialize particle state with x0, y0, 1, 1, Wx, Hy, 0.1	taking center of Normal Distribution to be N(0, 0.4)
-	states[0].xCoor = x0;
-	states[0].yCoor = y0;
+	//Calculation of target model histogram
+	calColorHistogram(initialXCoor, initialYCoor, targetWidth, targetHeight, imgRGB, imgWidth, imgHeight, modelHist, nbin);
+	// Initialize particle state with initialXCoor, initialYCoor, 1, 1, targetWidth, targetHeight, 0.1	taking center of Normal Distribution to be N(0, 0.4)
+	states[0].xCoor = initialXCoor;
+	states[0].yCoor = initialYCoor;
 	states[0].v_xt = (float) 0.0; 
 	states[0].v_yt = (float) 0.0; 
-	states[0].Hxt = Wx;
-	states[0].Hyt = Hy;
+	states[0].Hxt = targetWidth;
+	states[0].Hyt = targetHeight;
 	states[0].at_dot = (float) 0.0; 
 	weights[0] = (float)(1.0/ NUM_PARTICLE); 
-	for ( int i = 1; i < NUM_PARTICLE; i++ ) {
+	for (int i = 1; i < NUM_PARTICLE; i++) {
 		for ( int j = 0; j < 7; j++ ) {
-			random[j] = randGaussian( 0, (float)0.6 ); //Produce seven random Gaussian numbers 
+			random[j] = randGaussian(0, (float)0.6 ); //Produce seven random Gaussian numbers 
 		}
-		states[i].xCoor = (int)( states[0].xCoor + random[0] * Wx );
-		states[i].yCoor = (int)( states[0].yCoor + random[1] * Hy );
+		states[i].xCoor = (int)( states[0].xCoor + random[0] * targetWidth );
+		states[i].yCoor = (int)( states[0].yCoor + random[1] * targetHeight );
 		states[i].v_xt = (float)( states[0].v_xt + random[2] * VELOCITY_DISTURB );
 		states[i].v_yt = (float)( states[0].v_yt + random[3] * VELOCITY_DISTURB );
 		states[i].Hxt = (int)( states[0].Hxt + random[4] * SCALE_DISTURB );
 		states[i].Hyt = (int)( states[0].Hyt + random[5] * SCALE_DISTURB );
 		states[i].at_dot = (float)( states[0].at_dot + random[6] * SCALE_CHANGE_D );
-		// average weight is 1/N, because all particles  have equal probability
+		// average weight is 1/N because all particles have equal probability
 		weights[i] = (float)(1.0 / NUM_PARTICLE);
 	}
 	return 1;
@@ -288,13 +284,16 @@ int initialize(int x0, int y0, int Wx, int Hy, unsigned char * img, int W, int H
 Calculating normalized cumulative probability c'_i
 Modifies cumulatedWeight： an array with N+1 cumulated weights，
 */
-void normalizeCumulatedWeight( float * weightedProb, float * cumulatedWeight, int size ){
-	for ( int i = 0; i < size + 1; i++ ) 
+void normalizeCumulatedWeight( float * weightedProb, float * cumulatedWeight, int size){
+	for (int i = 0; i < size + 1; i++ ) {
 		cumulatedWeight[i] = 0;
-	for ( int i = 0; i < size; i++ )
+	}
+	for (int i = 0; i < size; i++ ){
 		cumulatedWeight[i+1] = cumulatedWeight[i] + weightedProb[i];
-	for ( int i = 0; i < size + 1; i++ )
+	}
+	for (int i = 0; i < size + 1; i++ ){
 		cumulatedWeight[i] = cumulatedWeight[i]/ cumulatedWeight[size];
+	}
 	return;
 }
 
@@ -304,7 +303,7 @@ Use binary search to find smallest index j where nCumuWeight[j] <= fixedRandomNu
 int binarySearch(float fixedRandomNum, float * nCumuWeight, int size ){
 	int leftIndex, rightIndex, middleIndex;
 	leftIndex = 0; 	
-	rightIndex = size-1;   
+	rightIndex = size - 1;   
 	while (rightIndex >= leftIndex){
 		middleIndex = (leftIndex  + rightIndex)/2;
 		if ( fixedRandomNum >= nCumuWeight[middleIndex] && fixedRandomNum < nCumuWeight[middleIndex+1]){
@@ -388,7 +387,7 @@ void propagate(SPACESTATE *state, int numStates ){
 
 /*
 Observe: Using the state set St of each sample and the observation from the histogram, 
-update the estimation to get new weighted probabilities. Modifies the weight array directly
+updates the estimation to get new weighted probabilities. Modifies the weight array directly
 */
 void observe( SPACESTATE *state, float *weight, int size, unsigned char *image, int widthImg, int heightImg, float *objectHist, int hbins ){
 	float *colorHist = new float[hbins];
@@ -408,7 +407,7 @@ void observe( SPACESTATE *state, float *weight, int size, unsigned char *image, 
 /*
 Estimate (according to the weights) the values of the state to use as a tracking output 
 */
-void estimate( SPACESTATE * state, float * weight, int size, SPACESTATE & EstState ){
+void estimate(SPACESTATE * state, float * weight, int size, SPACESTATE & estState ){
 	float at_dot, Hxt, Hyt, v_xt, v_yt, xCoor, yCoor, weight_sum;
 	at_dot = 0;
 	Hxt = 0; 
@@ -433,13 +432,13 @@ void estimate( SPACESTATE * state, float * weight, int size, SPACESTATE & EstSta
 	if ( weight_sum <= 0 ) {
 		weight_sum = 1; /* avoid division by 0*/
 	}
-	EstState.at_dot = at_dot / weight_sum;
-	EstState.Hxt = (int)(Hxt / weight_sum + 0.5 );
-	EstState.Hyt = (int)(Hyt / weight_sum + 0.5 );
-	EstState.v_xt = v_xt / weight_sum;
-	EstState.v_yt = v_yt / weight_sum;
-	EstState.xCoor = (int)(xCoor / weight_sum + 0.5 );
-	EstState.yCoor = (int)(yCoor / weight_sum + 0.5 );
+	estState.at_dot = at_dot / weight_sum;
+	estState.Hxt = (int)(Hxt / weight_sum + 0.5 );
+	estState.Hyt = (int)(Hyt / weight_sum + 0.5 );
+	estState.v_xt = v_xt / weight_sum;
+	estState.v_yt = v_yt / weight_sum;
+	estState.xCoor = (int)(xCoor / weight_sum + 0.5 );
+	estState.yCoor = (int)(yCoor / weight_sum + 0.5 );
 	return;
 }
 
@@ -456,18 +455,16 @@ Output：
 float * targetHist：    updated target histogram
 ************************************************************/
 
-int updateModel( SPACESTATE EstState, float * targetHist, int bins, float PiT, unsigned char * img, int widthImg, int heightImg ) {
+int updateModel( SPACESTATE estState, float * targetHist, int bins, float PiT, unsigned char * img, int widthImg, int heightImg ) {
 	float * estHist, bha, Pi_E;
 	int rvalue = -1;
 	estHist = new float [bins];
 	// 1.Calculate the estimated value of the target histogram 
-	calColorHistogram( EstState.xCoor, EstState.yCoor, EstState.Hxt, 
-		EstState.Hyt, img, widthImg, heightImg, estHist, bins );
+	calColorHistogram(estState.xCoor, estState.yCoor, estState.Hxt, estState.Hyt, img, widthImg, heightImg, estHist, bins);
 	// 2.calculate the Bhattacharyya coefficient 
-	bha  = calBhattacharyya( estHist, targetHist, bins );
+	bha  = calBhattacharyya(estHist, targetHist, bins);
 	// 3.Calculate the probability weights */
 	Pi_E = calWeightedPi( bha );
-
 	if ( Pi_E > PiT ) {
 		for ( int i = 0; i < bins; i++ ){
 			targetHist[i] = (float)((1.0 - ALPHA_COEFFICIENT) * targetHist[i] + ALPHA_COEFFICIENT * estHist[i]);
@@ -495,20 +492,20 @@ void clearAll(){
 }
 
 int trackColorParticle( unsigned char *image, int widthImg, int heightImg, int &xCoor, int &yCoor, int &Wx_h, int &Hy_h, float &max_weight ) {
-	SPACESTATE EstimatedState;
+	SPACESTATE estimatedState;
 	reselectParticles( states, weights, NUM_PARTICLE );
 	/* Sampling state equation to predict states variables or changes */
 	propagate( states, NUM_PARTICLE);
 	/* Observe and update the state and values */
 	observe( states, weights, NUM_PARTICLE, image, widthImg, heightImg, modelHist, nbin );
 	/* Estimate the position from the states values */
-	estimate( states, weights, NUM_PARTICLE, EstimatedState );
-	xCoor = EstimatedState.xCoor;
-	yCoor = EstimatedState.yCoor;
-	Wx_h = EstimatedState.Hxt;
-	Hy_h = EstimatedState.Hyt;
+	estimate( states, weights, NUM_PARTICLE, estimatedState );
+	xCoor = estimatedState.xCoor;
+	yCoor = estimatedState.yCoor;
+	Wx_h = estimatedState.Hxt;
+	Hy_h = estimatedState.Hyt;
 	// update the model 
-	updateModel( EstimatedState, modelHist, nbin, weightThreshold, image, widthImg, heightImg );
+	updateModel( estimatedState, modelHist, nbin, weightThreshold, image, widthImg, heightImg );
 	// calculate the maximum weight 
 	max_weight = weights[0];
 	for ( int i = 1; i < NUM_PARTICLE; i++ ){
@@ -531,7 +528,7 @@ string intToString(int number){
 //Method to find the Z coordinates.
 float findZCoor(float areaOfImageInPx){
 	float scale = STICKER_LENGTH_IN_CM/ STICKER_BREADTH_IN_CM;
-	float focalLength = sqrt (1196 / scale) / STICKER_LENGTH_IN_CM * ACTUAL_HEIGHT_IN_CM;
+	float focalLength = sqrt (43 / scale) / STICKER_LENGTH_IN_CM * 150;
 	if (areaOfImageInPx == 0){
 		return 0;
 	}
@@ -578,7 +575,7 @@ void mouseHandler( int event, int x, int y, int flags, void* param){
 	}
 }
 
-//use some of the openCV drawing functions to draw crosshairs on our tracked image
+//use some of the openCV drawing functions to draw a circle on our tracked image
 void drawObject(int x, int y , int z){
 	Scalar colorText = Scalar(0, 255, 0);
 	cvCircle(imgTrack, Point(x, y), 20 , CV_RGB(0, 255, 255), 2, 8, 0 );
@@ -587,8 +584,8 @@ void drawObject(int x, int y , int z){
 int main(int argc, char *argv[]){
 	VideoCapture capture;
 	if (argc == 1 || (argc == 2 && strlen(argv[1]) == 1 && isdigit(argv[1][0]))){
-		//capture.open(ID_CAM_GO_PRO);
-		capture.open(0);
+		capture.open(ID_CAM_GO_PRO);
+		//capture.open(0);
 	} else if( argc == 2 ){
 		capture.open(argv[1]);
 	} else {
@@ -600,14 +597,11 @@ int main(int argc, char *argv[]){
 	for (int i = 0; i < FRAME_INTERVAL; i++){
 		frame[i] = NULL;
 	}
-	Mat cameraFeed;
-	int row, col;
-	int star = 0;
-
+	int row, col, star = 0;
 	capture.set(CV_CAP_PROP_FRAME_WIDTH, FRAME_WIDTH);
 	capture.set(CV_CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT);
 
-	Mat distortion_coeff, camera_matrix;
+	Mat cameraFeed, distortion_coeff, camera_matrix;
 	FileStorage fs("out_camera_data.xml", FileStorage::READ);
 	fs["Distortion_Coefficients"] >> distortion_coeff;
 	fs["Camera_Matrix"] >> camera_matrix;
@@ -616,24 +610,21 @@ int main(int argc, char *argv[]){
 	//For removing distortion
 	Mat empty, newCameraMatrix, map1, map2, undistorted;
 	capture.read(cameraFeed);
-	Size imageSize = cameraFeed.size();
-	initUndistortRectifyMap(camera_matrix, distortion_coeff, empty, newCameraMatrix, imageSize, CV_32FC1, map1, map2);
+	initUndistortRectifyMap(camera_matrix, distortion_coeff, empty, newCameraMatrix, cameraFeed.size(), CV_32FC1, map1, map2);
 
-	while (1){
+	while(1){
 		Mat image(Size(FRAME_WIDTH, FRAME_HEIGHT), CV_8UC3);
 		capture.read(cameraFeed);
 		Mat temp = cameraFeed.clone();
 		remap(temp, undistorted, map1, map2, INTER_LINEAR, 0, 0);
 		curframe = new IplImage(undistorted);
-		if (!star) {
-			imgTrack = cvCreateImage(cvGetSize(curframe), IPL_DEPTH_8U, 3);
-			row = curframe -> height;
-			col = curframe -> width;
-			width = curframe -> width;
-			height = curframe -> height; 
-			img = new unsigned char [width * height * 3];
-			star = 1;
-		}
+		imgTrack = cvCreateImage(cvGetSize(curframe), IPL_DEPTH_8U, 3);
+		row = curframe -> height;
+		col = curframe -> width;
+		width = curframe -> width;
+		height = curframe -> height; 
+		img = new unsigned char [width * height * 3];
+		
 		imgTrack = cvCloneImage(curframe);
 		iplToImge(imgTrack, width, height);
 		if (shouldTrackObject){
@@ -643,28 +634,32 @@ int main(int argc, char *argv[]){
 			//if ( rho_v > 0 && max_weight > 0.0001 ) { /* determines if target is lost */
 			if (rho_v > 0 ){
 				Point seed = Point(xout, yout);
-				int loDiff = 50, upDiff = 55; //by trial and error
 				int connectivity = 4;
-				int isColor = true;
 				bool useMask = false;
 				int newMaskVal = 255;
 				int ffillMode = 1;
-				int lo = ffillMode == 0 ? 0 : loDiff;
-				int up = ffillMode == 0 ? 0 : upDiff;
-				int flags = connectivity + (newMaskVal << 8) + (ffillMode == 1 ? CV_FLOODFILL_FIXED_RANGE : 0);
+				int lo = 50; //by trial and error
+				int up = 55;
+				int flags = connectivity + (newMaskVal << 8) + (CV_FLOODFILL_FIXED_RANGE);
 				int b = (unsigned)theRNG() & 255;
 				int g = (unsigned)theRNG() & 255;
 				int r = (unsigned)theRNG() & 255;
 				Rect ccomp;
-				Scalar newVal = isColor ? Scalar(b, g, r) : Scalar(r * 0.299 + g * 0.587 + b * 0.114);
+				Scalar newVal = Scalar(b, g, r);
 				Mat dst = imgTrack;
 				int area = floodFill(dst, seed, newVal, &ccomp, Scalar(lo, lo, lo), Scalar(up, up, up), flags);
-				
-				int zout = findZCoor(area);
-				//cout << area << " pixels were repainted\n"; //Used for calibration
+				int zCoor = findZCoor(area);
+				//We assume that zCoor found from floodFill and findZCoor will not change by more than 10cm in b/w 2 frames.
+				/*if ((abs(zCoor - zout) <= 10)  ){
+					zout = zCoor;
+				}*/
+				zout = zCoor;
+				cout << area << " pixels were repainted\n"; //To be used for calibration of findZCoor
 
-				//Drawing bounding rectangle based on stored xout and yout values.
-				//We make the bounding rectangle bigger than actual size to do processing on it.
+				/*
+				Drawing bounding rectangle based on stored xout and yout values.
+				We make the bounding rectangle slightly bigger than actual size to do processing on it. 
+				*/
 				int xTopLeft = xout - widthOutput;
 				int xTopRight = xout + widthOutput;
 				int yTopLeft =  yout - heightOutput;
@@ -678,7 +673,7 @@ int main(int argc, char *argv[]){
 				cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX|CV_FONT_ITALIC, hScale, vScale, 0, LINE_WIDTH);
 				std::string s =  std::to_string(xout) + "," + std::to_string(yout) + "," + std::to_string(zout);
 				char* c = new char[s.length() + 1];
-				strcpy_s(c, 11, s.c_str());
+				strcpy_s(c, 12, s.c_str());
 				cvPutText (imgTrack, c , cvPoint(30, 30), &font, cvScalar(255, 255, 0));
 				xin = xout; //for next frame
 				yin = yout;
